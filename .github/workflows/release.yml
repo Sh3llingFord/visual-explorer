@@ -1,0 +1,43 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --save-dev typescript esbuild obsidian@latest
+
+      - name: Build
+        run: node esbuild.config.mjs
+
+      - name: Get version from manifest
+        id: version
+        run: echo "version=$(jq -r .version manifest.json)" >> $GITHUB_OUTPUT
+
+      - name: Delete existing release if exists
+        run: gh release delete ${{ steps.version.outputs.version }} --yes || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        run: |
+          gh release create ${{ steps.version.outputs.version }} \
+            main.js manifest.json \
+            --title "${{ steps.version.outputs.version }}" \
+            --notes "Build from commit ${{ github.sha }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
