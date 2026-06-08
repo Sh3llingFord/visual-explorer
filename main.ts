@@ -725,7 +725,7 @@ export default class NoteGalleryPlugin extends Plugin {
       }
       .note-gallery-back-btn {
         position: absolute;
-        bottom: 21px;
+        bottom: 22px;
         left: 16px;
         width: 50px;
         height: 50px;
