@@ -397,7 +397,7 @@ class NoteGalleryView extends ItemView {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("note-gallery-container");
-    container.style.height = container.parentElement?.clientHeight + "px";
+    this.containerEl.style.position = "relative";
 
     // ── Toolbar ──────────────────────────────────────────────
     const toolbar = container.createDiv({ cls: "note-gallery-toolbar" });
@@ -966,7 +966,8 @@ export default class NoteGalleryPlugin extends Plugin {
         padding: 0;
         display: flex;
         flex-direction: column;
-        height: 100%;
+        position: absolute;
+        inset: 0;
         overflow: hidden;
       }
       .note-gallery-toolbar {
