@@ -19,6 +19,7 @@ interface NoteGallerySettings {
   dateLocale: string;
   sortBy: "modified" | "created" | "name";
   titleWrap: boolean;
+  backButtonPosition: "bottom-left" | "bottom-right";
 }
 
 const DEFAULT_SETTINGS: NoteGallerySettings = {
@@ -27,6 +28,7 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   dateLocale: "de-DE",
   sortBy: "modified",
   titleWrap: false,
+  backButtonPosition: "bottom-left",
 };
 
 function extractFirstImage(content: string): string | null {
@@ -205,7 +207,7 @@ class NoteGalleryView extends ItemView {
   async render() {
     if (!this.folder) return;
 
-    const { thumbnailSize, filesFolder, dateLocale, sortBy, titleWrap } = this.plugin.settings;
+    const { thumbnailSize, filesFolder, dateLocale, sortBy, titleWrap, backButtonPosition } = this.plugin.settings;
 
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
@@ -251,6 +253,22 @@ class NoteGalleryView extends ItemView {
     // ── List ────────────────────────────────────────────────
     const listContainer = container.createDiv({ cls: "note-gallery-list" });
     await this.renderList(listContainer, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+
+    // ── Floating Back Button ─────────────────────────────────
+    const isRoot = !this.folder.parent || this.folder.path === "/";
+    if (!isRoot) {
+      const backBtn = container.createDiv({ cls: "note-gallery-back-btn" });
+      backBtn.setText("←");
+      backBtn.title = "Zurück";
+      if (backButtonPosition === "bottom-right") {
+        backBtn.addClass("note-gallery-back-btn--right");
+      }
+      backBtn.addEventListener("click", () => {
+        if (this.folder.parent) {
+          this.navigateTo(this.folder.parent);
+        }
+      });
+    }
   }
 
   async renderList(
@@ -432,6 +450,20 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .addOption("en-GB", "English UK (13 Oct 2024)")
           .setValue(this.plugin.settings.dateLocale)
           .onChange(async (value) => { this.plugin.settings.dateLocale = value; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName("Zurück-Button Position")
+      .setDesc("Position des floating Zurück-Buttons für Unterordner-Navigation")
+      .addDropdown(drop =>
+        drop
+          .addOption("bottom-left", "Unten links (Rechtshänder)")
+          .addOption("bottom-right", "Unten rechts (Linkshänder)")
+          .setValue(this.plugin.settings.backButtonPosition)
+          .onChange(async (value) => {
+            this.plugin.settings.backButtonPosition = value as "bottom-left" | "bottom-right";
+            await this.plugin.saveSettings();
+          })
       );
 
     new Setting(containerEl)
@@ -690,6 +722,35 @@ export default class NoteGalleryPlugin extends Plugin {
         gap: 8px;
         justify-content: flex-end;
         margin-top: 16px;
+      }
+      .note-gallery-back-btn {
+        position: absolute;
+        bottom: 24px;
+        left: 16px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: var(--interactive-accent);
+        color: white;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        transition: background 0.15s, transform 0.1s;
+        z-index: 20;
+      }
+      .note-gallery-back-btn--right {
+        left: unset;
+        right: 16px;
+      }
+      .note-gallery-back-btn:hover {
+        background: var(--interactive-accent-hover);
+        transform: scale(1.05);
+      }
+      .note-gallery-back-btn:active {
+        transform: scale(0.95);
       }
     `;
     document.head.appendChild(style);
