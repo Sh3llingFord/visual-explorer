@@ -525,11 +525,16 @@ class NoteGalleryView extends ItemView {
             label: s.newNoteInFolder,
             icon: "file-plus",
             action: async () => {
-              const name = s.newNote(new Date().toLocaleDateString(this.plugin.settings.dateLocale));
-              const path = subfolder.path + "/" + name + ".md";
-              const file = await this.app.vault.create(path, "");
-              await this.app.workspace.getLeaf(false).openFile(file);
-              await this.render();
+              try {
+                const timestamp = Date.now();
+                const name = s.newNote(new Date().toLocaleDateString(this.plugin.settings.dateLocale)) + " " + timestamp;
+                const path = subfolder.path + "/" + name + ".md";
+                const file = await this.app.vault.create(path, "");
+                await this.app.workspace.getLeaf(false).openFile(file);
+                await this.render();
+              } catch (err) {
+                new Notice("Fehler beim Erstellen der Notiz: " + err);
+              }
             }
           },
           {
