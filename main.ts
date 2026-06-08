@@ -339,13 +339,13 @@ class NoteGalleryView extends ItemView {
       if (file instanceof TFile && file.parent?.path === this.folder?.path) await this.render();
     }));
     this.registerEvent(this.app.vault.on("create", async (file) => {
-      if (file instanceof TFile && file.parent?.path === this.folder?.path) await this.render();
+      if (file instanceof TFile && (file.parent?.path === this.folder?.path || file.parent?.parent?.path === this.folder?.path)) await this.render();
     }));
     this.registerEvent(this.app.vault.on("delete", async (file) => {
-      if (file instanceof TFile && file.parent?.path === this.folder?.path) await this.render();
+      if (file instanceof TFile && (file.parent?.path === this.folder?.path || file.parent?.parent?.path === this.folder?.path)) await this.render();
     }));
     this.registerEvent(this.app.vault.on("rename", async (file) => {
-      if (file instanceof TFile && file.parent?.path === this.folder?.path) await this.render();
+      if (file instanceof TFile && (file.parent?.path === this.folder?.path || file.parent?.parent?.path === this.folder?.path)) await this.render();
     }));
     await this.render();
   }
@@ -529,6 +529,7 @@ class NoteGalleryView extends ItemView {
               const path = subfolder.path + "/" + name + ".md";
               const file = await this.app.vault.create(path, "");
               await this.app.workspace.getLeaf(false).openFile(file);
+              await this.render();
             }
           },
           {
