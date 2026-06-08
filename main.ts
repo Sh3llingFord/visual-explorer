@@ -433,7 +433,8 @@ class NoteGalleryView extends ItemView {
     searchInput.value = this.searchQuery;
     searchInput.addEventListener("input", async () => {
       this.searchQuery = searchInput.value;
-      await this.renderList(listContainer, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+      const lc = container.querySelector(".note-gallery-list") as HTMLElement;
+      if (lc) await this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
     });
 
     // + button → context menu

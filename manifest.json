@@ -1,7 +1,7 @@
 {
   "id": "note-gallery",
   "name": "Note Gallery",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "minAppVersion": "1.0.0",
   "description": "Shows notes as cards with image preview, like UpNote.",
   "author": "Andi",
