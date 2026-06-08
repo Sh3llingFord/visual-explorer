@@ -371,6 +371,7 @@ class NoteGalleryView extends ItemView {
         new ConfirmDeleteModal(this.app, file.basename, async () => {
           await this.app.vault.trash(file, true);
           new Notice(`"${file.basename}" gelöscht`);
+          await this.render();
         }).open();
       });
 
@@ -456,6 +457,20 @@ export default class NoteGalleryPlugin extends Plugin {
 
     this.addSettingTab(new NoteGallerySettingTab(this.app, this));
 
+    // Ribbon Icon
+    this.addRibbonIcon("layout-grid", "Note Gallery öffnen", async () => {
+      await this.openGallery(this.app.vault.getRoot());
+    });
+
+    // Command
+    this.addCommand({
+      id: "open-note-gallery",
+      name: "Note Gallery öffnen",
+      callback: async () => {
+        await this.openGallery(this.app.vault.getRoot());
+      },
+    });
+
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
         if (file instanceof TFolder) {
@@ -475,6 +490,15 @@ export default class NoteGalleryPlugin extends Plugin {
     );
 
     this.addStyles();
+  }
+
+  async openGallery(folder: TFolder) {
+    const leaf = this.app.workspace.getLeaf(true);
+    await leaf.setViewState({
+      type: VIEW_TYPE,
+      active: true,
+      state: { folderPath: folder.path },
+    });
   }
 
   async loadSettings() {
