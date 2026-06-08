@@ -64,6 +64,11 @@ const STRINGS = {
     subfolders: "Unterordner",
     deleted: (name: string) => `"${name}" gelöscht`,
     newNote: (date: string) => `Neue Notiz ${date}`,
+    renameFolder: "Ordner umbenennen",
+    deleteFolder: "Ordner löschen",
+    newNoteInFolder: "Neue Notiz hier",
+    deleteFolderTitle: "Ordner löschen?",
+    deleteFolderConfirm: (name: string) => `"${name}" und alle Inhalte werden in den Papierkorb verschoben.`,
   },
   en: {
     search: "Search…",
@@ -88,6 +93,11 @@ const STRINGS = {
     subfolders: "Subfolders",
     deleted: (name: string) => `"${name}" deleted`,
     newNote: (date: string) => `New note ${date}`,
+    renameFolder: "Rename folder",
+    deleteFolder: "Delete folder",
+    newNoteInFolder: "New note here",
+    deleteFolderTitle: "Delete folder?",
+    deleteFolderConfirm: (name: string) => `"${name}" and all its contents will be moved to trash.`,
   },
 };
 
@@ -506,6 +516,75 @@ class NoteGalleryView extends ItemView {
       const folderCount = subfolder.children.filter(f => f instanceof TFolder).length;
       const meta = [fileCount + " " + s.notes, folderCount > 0 ? folderCount + " " + s.subfolders : ""].filter(Boolean).join(" · ");
       textDiv.createDiv({ cls: "note-gallery-date", text: meta });
+
+      const openFolderMenu = (e: MouseEvent | TouchEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(this.app, e, [
+          {
+            label: s.newNoteInFolder,
+            icon: "file-plus",
+            action: async () => {
+              const name = s.newNote(new Date().toLocaleDateString(this.plugin.settings.dateLocale));
+              const path = subfolder.path + "/" + name + ".md";
+              const file = await this.app.vault.create(path, "");
+              await this.app.workspace.getLeaf(false).openFile(file);
+            }
+          },
+          {
+            label: s.renameFolder,
+            icon: "pencil",
+            action: () => {
+              const modal = new Modal(this.app);
+              modal.titleEl.setText(s.renameFolder);
+              const input = modal.contentEl.createEl("input", { type: "text", cls: "note-gallery-rename-input" });
+              input.value = subfolder.name;
+              input.select();
+              const btnRow = modal.contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
+              btnRow.createEl("button", { text: s.cancel }).addEventListener("click", () => modal.close());
+              const confirmBtn = btnRow.createEl("button", { text: s.renameConfirm, cls: "mod-cta" });
+              confirmBtn.addEventListener("click", async () => {
+                const newName = input.value.trim();
+                if (newName && newName !== subfolder.name) {
+                  const newPath = (subfolder.parent?.path ?? "") + "/" + newName;
+                  await this.app.fileManager.renameFile(subfolder, newPath);
+                  await this.render();
+                }
+                modal.close();
+              });
+              input.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmBtn.click(); if (e.key === "Escape") modal.close(); });
+              modal.open();
+              setTimeout(() => input.focus(), 50);
+            }
+          },
+          {
+            label: s.deleteFolder,
+            icon: "trash",
+            danger: true,
+            action: () => {
+              const modal = new Modal(this.app);
+              modal.titleEl.setText(s.deleteFolderTitle);
+              modal.contentEl.createEl("p", { text: s.deleteFolderConfirm(subfolder.name) });
+              const btnRow = modal.contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
+              btnRow.createEl("button", { text: s.cancel }).addEventListener("click", () => modal.close());
+              const deleteBtn = btnRow.createEl("button", { text: s.deleteFolder, cls: "mod-warning" });
+              deleteBtn.addEventListener("click", async () => {
+                await this.app.vault.trash(subfolder, true);
+                new Notice(s.deleted(subfolder.name));
+                await this.render();
+                modal.close();
+              });
+              modal.open();
+            }
+          },
+        ]);
+      };
+
+      card.addEventListener("contextmenu", (e) => openFolderMenu(e));
+      let longPressTimer: ReturnType<typeof setTimeout>;
+      card.addEventListener("touchstart", (e) => { longPressTimer = setTimeout(() => openFolderMenu(e), 500); }, { passive: true });
+      card.addEventListener("touchend", () => clearTimeout(longPressTimer));
+      card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
       card.addEventListener("click", () => this.navigateTo(subfolder));
     }
 
