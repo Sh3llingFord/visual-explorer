@@ -325,6 +325,44 @@ class NoteGalleryView extends ItemView {
     return crumbs;
   }
 
+  async createNoteWithName(folderPath: string) {
+    const s = STRINGS[this.plugin.settings.language];
+    return new Promise<void>((resolve) => {
+      const modal = new Modal(this.app);
+      modal.titleEl.setText(s.newDoc);
+      const input = modal.contentEl.createEl("input", {
+        type: "text",
+        cls: "note-gallery-rename-input",
+        placeholder: s.newDoc,
+      });
+      input.focus();
+      const btnRow = modal.contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
+      btnRow.createEl("button", { text: s.cancel }).addEventListener("click", () => { modal.close(); resolve(); });
+      const confirmBtn = btnRow.createEl("button", { text: s.createFolderConfirm, cls: "mod-cta" });
+      confirmBtn.addEventListener("click", async () => {
+        const name = input.value.trim();
+        if (name) {
+          try {
+            const path = (folderPath ? folderPath + "/" : "") + name + ".md";
+            const file = await this.app.vault.create(path, "");
+            await this.app.workspace.getLeaf(false).openFile(file);
+            await this.render();
+          } catch (err) {
+            new Notice("Fehler: " + err);
+          }
+        }
+        modal.close();
+        resolve();
+      });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") confirmBtn.click();
+        if (e.key === "Escape") { modal.close(); resolve(); }
+      });
+      modal.open();
+      setTimeout(() => input.focus(), 50);
+    });
+  }
+
   async navigateTo(folder: TFolder) {
     this.mode = "folder";
     this.folder = folder;
@@ -413,10 +451,7 @@ class NoteGalleryView extends ItemView {
           label: s.newDoc,
           icon: "file-plus",
           action: async () => {
-            const name = s.newNote(new Date().toLocaleDateString(this.plugin.settings.dateLocale));
-            const path = this.folder.path + "/" + name + ".md";
-            const file = await this.app.vault.create(path, "");
-            await this.app.workspace.getLeaf(false).openFile(file);
+            await this.createNoteWithName(this.folder.path);
           }
         },
         {
@@ -525,16 +560,7 @@ class NoteGalleryView extends ItemView {
             label: s.newNoteInFolder,
             icon: "file-plus",
             action: async () => {
-              try {
-                const timestamp = Date.now();
-                const name = s.newNote(new Date().toLocaleDateString(this.plugin.settings.dateLocale)) + " " + timestamp;
-                const path = subfolder.path + "/" + name + ".md";
-                const file = await this.app.vault.create(path, "");
-                await this.app.workspace.getLeaf(false).openFile(file);
-                await this.render();
-              } catch (err) {
-                new Notice("Fehler beim Erstellen der Notiz: " + err);
-              }
+              await this.createNoteWithName(subfolder.path);
             }
           },
           {
