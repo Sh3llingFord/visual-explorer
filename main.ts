@@ -709,18 +709,17 @@ export default class NoteGalleryPlugin extends Plugin {
         right: 12px;
         top: 8px;
         font-size: 14px;
-        opacity: 0;
+        opacity: 0.3;
         cursor: pointer;
-        transition: opacity 0.15s;
+        transition: opacity 0.15s, color 0.15s;
         z-index: 2;
         padding: 2px 4px;
         border-radius: 4px;
-      }
-      .note-gallery-card:hover .note-gallery-delete-btn {
-        opacity: 0.5;
+        color: var(--text-faint);
       }
       .note-gallery-delete-btn:hover {
         opacity: 1 !important;
+        color: var(--text-error);
         background: var(--background-modifier-error);
       }
       .note-gallery-modal-buttons {
