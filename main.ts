@@ -21,6 +21,10 @@ interface NoteGallerySettings {
   sortBy: "modified" | "created" | "name";
   titleWrap: boolean;
   backButtonPosition: "bottom-left" | "bottom-right";
+  language: "de" | "en";
+  recentCount: number;
+  showPreview: boolean;
+  breadcrumbFontSize: number;
 }
 
 const DEFAULT_SETTINGS: NoteGallerySettings = {
@@ -30,6 +34,61 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   sortBy: "modified",
   titleWrap: false,
   backButtonPosition: "bottom-left",
+  language: "de",
+  recentCount: 30,
+  showPreview: true,
+  breadcrumbFontSize: 12,
+};
+
+const STRINGS = {
+  de: {
+    search: "Suchen…",
+    recent: "Zuletzt geöffnet",
+    newDoc: "Neues Dokument",
+    favorites: "Favoriten",
+    createFolder: "Ordner erstellen",
+    addFavorite: "Favorit hinzufügen",
+    removeFavorite: "Favorit entfernen",
+    rename: "Umbenennen",
+    delete: "Löschen",
+    back: "← Ordner",
+    deleteTitle: "Notiz löschen?",
+    deleteConfirm: (name: string) => `"${name}" wird in den Papierkorb verschoben.`,
+    cancel: "Abbrechen",
+    renameTitle: "Notiz umbenennen",
+    renameConfirm: "Umbenennen",
+    createFolderTitle: "Neuen Ordner erstellen",
+    createFolderPlaceholder: "Ordnername",
+    createFolderConfirm: "Erstellen",
+    notes: "Notizen",
+    subfolders: "Unterordner",
+    deleted: (name: string) => `"${name}" gelöscht`,
+    newNote: (date: string) => `Neue Notiz ${date}`,
+  },
+  en: {
+    search: "Search…",
+    recent: "Recently opened",
+    newDoc: "New document",
+    favorites: "Favorites",
+    createFolder: "Create folder",
+    addFavorite: "Add to favorites",
+    removeFavorite: "Remove from favorites",
+    rename: "Rename",
+    delete: "Delete",
+    back: "← Folder",
+    deleteTitle: "Delete note?",
+    deleteConfirm: (name: string) => `"${name}" will be moved to trash.`,
+    cancel: "Cancel",
+    renameTitle: "Rename note",
+    renameConfirm: "Rename",
+    createFolderTitle: "Create new folder",
+    createFolderPlaceholder: "Folder name",
+    createFolderConfirm: "Create",
+    notes: "Notes",
+    subfolders: "Subfolders",
+    deleted: (name: string) => `"${name}" deleted`,
+    newNote: (date: string) => `New note ${date}`,
+  },
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -86,21 +145,23 @@ function isFavorite(frontmatter: Record<string, unknown>): boolean {
 class ConfirmDeleteModal extends Modal {
   private fileName: string;
   private onConfirm: () => void;
+  private s: typeof STRINGS["de"];
 
-  constructor(app: App, fileName: string, onConfirm: () => void) {
+  constructor(app: App, fileName: string, s: typeof STRINGS["de"], onConfirm: () => void) {
     super(app);
     this.fileName = fileName;
     this.onConfirm = onConfirm;
+    this.s = s;
   }
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: "Notiz löschen?" });
-    contentEl.createEl("p", { text: `"${this.fileName}" wird in den Papierkorb verschoben.` });
+    contentEl.createEl("h3", { text: this.s.deleteTitle });
+    contentEl.createEl("p", { text: this.s.deleteConfirm(this.fileName) });
     const btnRow = contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
-    const cancelBtn = btnRow.createEl("button", { text: "Abbrechen" });
+    const cancelBtn = btnRow.createEl("button", { text: this.s.cancel });
     cancelBtn.addEventListener("click", () => this.close());
-    const deleteBtn = btnRow.createEl("button", { text: "Löschen", cls: "mod-warning" });
+    const deleteBtn = btnRow.createEl("button", { text: this.s.delete, cls: "mod-warning" });
     deleteBtn.addEventListener("click", () => { this.onConfirm(); this.close(); });
   }
 
@@ -110,23 +171,25 @@ class ConfirmDeleteModal extends Modal {
 class RenameModal extends Modal {
   private file: TFile;
   private onConfirm: (newName: string) => void;
+  private s: typeof STRINGS["de"];
 
-  constructor(app: App, file: TFile, onConfirm: (newName: string) => void) {
+  constructor(app: App, file: TFile, s: typeof STRINGS["de"], onConfirm: (newName: string) => void) {
     super(app);
     this.file = file;
     this.onConfirm = onConfirm;
+    this.s = s;
   }
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: "Notiz umbenennen" });
+    contentEl.createEl("h3", { text: this.s.renameTitle });
     const input = contentEl.createEl("input", { type: "text", cls: "note-gallery-rename-input" });
     input.value = this.file.basename;
     input.select();
     const btnRow = contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
-    const cancelBtn = btnRow.createEl("button", { text: "Abbrechen" });
+    const cancelBtn = btnRow.createEl("button", { text: this.s.cancel });
     cancelBtn.addEventListener("click", () => this.close());
-    const confirmBtn = btnRow.createEl("button", { text: "Umbenennen", cls: "mod-cta" });
+    const confirmBtn = btnRow.createEl("button", { text: this.s.renameConfirm, cls: "mod-cta" });
     confirmBtn.addEventListener("click", () => {
       const newName = input.value.trim();
       if (newName && newName !== this.file.basename) {
@@ -146,22 +209,24 @@ class RenameModal extends Modal {
 class CreateFolderModal extends Modal {
   private parentPath: string;
   private onConfirm: (name: string) => void;
+  private s: typeof STRINGS["de"];
 
-  constructor(app: App, parentPath: string, onConfirm: (name: string) => void) {
+  constructor(app: App, parentPath: string, s: typeof STRINGS["de"], onConfirm: (name: string) => void) {
     super(app);
     this.parentPath = parentPath;
     this.onConfirm = onConfirm;
+    this.s = s;
   }
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: "Neuen Ordner erstellen" });
-    const input = contentEl.createEl("input", { type: "text", cls: "note-gallery-rename-input", placeholder: "Ordnername" });
+    contentEl.createEl("h3", { text: this.s.createFolderTitle });
+    const input = contentEl.createEl("input", { type: "text", cls: "note-gallery-rename-input", placeholder: this.s.createFolderPlaceholder });
     input.focus();
     const btnRow = contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
-    const cancelBtn = btnRow.createEl("button", { text: "Abbrechen" });
+    const cancelBtn = btnRow.createEl("button", { text: this.s.cancel });
     cancelBtn.addEventListener("click", () => this.close());
-    const confirmBtn = btnRow.createEl("button", { text: "Erstellen", cls: "mod-cta" });
+    const confirmBtn = btnRow.createEl("button", { text: this.s.createFolderConfirm, cls: "mod-cta" });
     confirmBtn.addEventListener("click", () => {
       const name = input.value.trim();
       if (name) { this.onConfirm(name); }
@@ -278,7 +343,8 @@ class NoteGalleryView extends ItemView {
   async render() {
     if (!this.folder) return;
 
-    const { thumbnailSize, filesFolder, dateLocale, sortBy, titleWrap, backButtonPosition } = this.plugin.settings;
+    const { thumbnailSize, filesFolder, dateLocale, sortBy, titleWrap, backButtonPosition, language, breadcrumbFontSize } = this.plugin.settings;
+    const s = STRINGS[language];
 
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
@@ -290,6 +356,7 @@ class NoteGalleryView extends ItemView {
     // Breadcrumb (only in folder mode)
     if (this.mode === "folder") {
       const breadcrumbEl = toolbar.createDiv({ cls: "note-gallery-breadcrumb" });
+      breadcrumbEl.style.fontSize = breadcrumbFontSize + "px";
       this.breadcrumb.forEach((crumb, i) => {
         if (i > 0) breadcrumbEl.createSpan({ cls: "note-gallery-breadcrumb-sep", text: " / " });
         const crumbEl = breadcrumbEl.createSpan({ cls: "note-gallery-breadcrumb-item", text: crumb.name || "Vault" });
@@ -300,10 +367,11 @@ class NoteGalleryView extends ItemView {
       });
     } else {
       const modeLabel = toolbar.createDiv({ cls: "note-gallery-breadcrumb" });
-      modeLabel.createSpan({ cls: "note-gallery-breadcrumb-link", text: "← Ordner" })
+      modeLabel.style.fontSize = breadcrumbFontSize + "px";
+      modeLabel.createSpan({ cls: "note-gallery-breadcrumb-link", text: s.back })
         .addEventListener("click", () => { this.mode = "folder"; this.render(); });
       modeLabel.createSpan({ cls: "note-gallery-breadcrumb-sep", text: " / " });
-      modeLabel.createSpan({ text: this.mode === "recent" ? "Zuletzt geöffnet" : "Favoriten" });
+      modeLabel.createSpan({ text: this.mode === "recent" ? s.recent : s.favorites });
     }
 
     // Controls: search + action menu button
@@ -312,7 +380,7 @@ class NoteGalleryView extends ItemView {
     const searchInput = controls.createEl("input", {
       cls: "note-gallery-search",
       type: "text",
-      placeholder: "Suchen…",
+      placeholder: s.search,
     });
     searchInput.value = this.searchQuery;
     searchInput.addEventListener("input", async () => {
@@ -327,30 +395,30 @@ class NoteGalleryView extends ItemView {
       e.stopPropagation();
       showContextMenu(this.app, e, [
         {
-          label: "Zuletzt geöffnet",
+          label: s.recent,
           icon: "clock",
           action: () => { this.mode = "recent"; this.searchQuery = ""; this.render(); }
         },
         {
-          label: "Neues Dokument",
+          label: s.newDoc,
           icon: "file-plus",
           action: async () => {
-            const name = `Neue Notiz ${new Date().toLocaleDateString("de-DE")}`;
+            const name = s.newNote(new Date().toLocaleDateString(this.plugin.settings.dateLocale));
             const path = this.folder.path + "/" + name + ".md";
             const file = await this.app.vault.create(path, "");
             await this.app.workspace.getLeaf(false).openFile(file);
           }
         },
         {
-          label: "Favoriten",
+          label: s.favorites,
           icon: "star",
           action: () => { this.mode = "favorites"; this.searchQuery = ""; this.render(); }
         },
         {
-          label: "Ordner erstellen",
+          label: s.createFolder,
           icon: "folder-plus",
           action: () => {
-            new CreateFolderModal(this.app, this.folder.path, async (name) => {
+            new CreateFolderModal(this.app, this.folder.path, s, async (name) => {
               const path = this.folder.path + "/" + name;
               await this.app.vault.createFolder(path);
               await this.render();
@@ -386,7 +454,8 @@ class NoteGalleryView extends ItemView {
     thumbnailSize: number
   ) {
     listContainer.empty();
-
+    const { language, recentCount, showPreview } = this.plugin.settings;
+    const s = STRINGS[language];
     const q = this.searchQuery.toLowerCase();
 
     // ── Recent / Favorites mode ──────────────────────────────
@@ -394,7 +463,7 @@ class NoteGalleryView extends ItemView {
       let files = this.app.vault.getMarkdownFiles();
 
       if (this.mode === "recent") {
-        files = files.sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, 30);
+        files = files.sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, recentCount);
       } else {
         files = files.filter(f => {
           const cache = this.app.metadataCache.getFileCache(f);
@@ -435,7 +504,7 @@ class NoteGalleryView extends ItemView {
       textDiv.createDiv({ cls: "note-gallery-title note-gallery-folder-title", text: subfolder.name });
       const fileCount = subfolder.children.filter(f => f instanceof TFile && (f as TFile).extension === "md").length;
       const folderCount = subfolder.children.filter(f => f instanceof TFolder).length;
-      const meta = [fileCount + " Notizen", folderCount > 0 ? folderCount + " Unterordner" : ""].filter(Boolean).join(" · ");
+      const meta = [fileCount + " " + s.notes, folderCount > 0 ? folderCount + " " + s.subfolders : ""].filter(Boolean).join(" · ");
       textDiv.createDiv({ cls: "note-gallery-date", text: meta });
       card.addEventListener("click", () => this.navigateTo(subfolder));
     }
@@ -456,7 +525,7 @@ class NoteGalleryView extends ItemView {
     if (existingCounter) existingCounter.remove();
     if (toolbar) {
       const counter = toolbar.createDiv({ cls: "note-gallery-counter" });
-      counter.setText(files.length + (subfolders.length > 0 ? ` Notizen · ${subfolders.length} Ordner` : " Notizen"));
+      counter.setText(files.length + " " + s.notes + (subfolders.length > 0 ? ` · ${subfolders.length} ` + s.subfolders : ""));
     }
 
     for (const file of files) {
@@ -474,6 +543,8 @@ class NoteGalleryView extends ItemView {
     titleWrap: boolean,
     thumbnailSize: number
   ) {
+    const { language, showPreview } = this.plugin.settings;
+    const s = STRINGS[language];
     const content = await this.app.vault.read(file);
     const cache = this.app.metadataCache.getFileCache(file);
     const frontmatter = (cache?.frontmatter ?? {}) as Record<string, unknown>;
@@ -489,14 +560,14 @@ class NoteGalleryView extends ItemView {
     // Left: text
     const textDiv = card.createDiv({ cls: "note-gallery-text" });
     const titleRow = textDiv.createDiv({ cls: "note-gallery-title-row" });
-    if (favorite) titleRow.createSpan({ cls: "note-gallery-favorite-star", text: "⭐ " });
+    if (favorite) titleRow.createSpan({ cls: "note-gallery-favorite-star", text: "★ " });
     const titleEl = titleRow.createSpan({ cls: "note-gallery-title" });
     titleEl.setText(file.basename);
     if (titleWrap) titleEl.addClass("note-gallery-title--wrap");
 
     if (category) textDiv.createDiv({ cls: "note-gallery-category", text: category });
     textDiv.createDiv({ cls: "note-gallery-date", text: dateStr });
-    if (previewText) textDiv.createDiv({ cls: "note-gallery-preview", text: previewText });
+    if (showPreview && previewText) textDiv.createDiv({ cls: "note-gallery-preview", text: previewText });
 
     // Right: image
     if (imgPath) {
@@ -543,10 +614,10 @@ class NoteGalleryView extends ItemView {
           }
         },
         {
-          label: "Umbenennen",
+          label: s.rename,
           icon: "pencil",
           action: () => {
-            new RenameModal(this.app, file, async (newName) => {
+            new RenameModal(this.app, file, s, async (newName) => {
               const newPath = file.parent?.path + "/" + newName + ".md";
               await this.app.fileManager.renameFile(file, newPath);
               await this.render();
@@ -554,13 +625,13 @@ class NoteGalleryView extends ItemView {
           }
         },
         {
-          label: "Löschen",
+          label: s.delete,
           icon: "trash",
           danger: true,
           action: () => {
-            new ConfirmDeleteModal(this.app, file.basename, async () => {
+            new ConfirmDeleteModal(this.app, file.basename, s, async () => {
               await this.app.vault.trash(file, true);
-              new Notice(`"${file.basename}" gelöscht`);
+              new Notice(s.deleted(file.basename));
               await this.render();
             }).open();
           }
@@ -655,6 +726,40 @@ class NoteGallerySettingTab extends PluginSettingTab {
       .addToggle(toggle =>
         toggle.setValue(this.plugin.settings.titleWrap)
           .onChange(async (value) => { this.plugin.settings.titleWrap = value; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName("Sprache / Language")
+      .setDesc("Sprache der Benutzeroberfläche / UI language")
+      .addDropdown(drop =>
+        drop.addOption("de", "Deutsch")
+          .addOption("en", "English")
+          .setValue(this.plugin.settings.language)
+          .onChange(async (value) => { this.plugin.settings.language = value as "de" | "en"; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName("Anzahl \"Zuletzt geöffnet\" / Recent count")
+      .setDesc("Wie viele Notizen unter \"Zuletzt geöffnet\" angezeigt werden")
+      .addSlider(slider =>
+        slider.setLimits(5, 100, 5).setValue(this.plugin.settings.recentCount).setDynamicTooltip()
+          .onChange(async (value) => { this.plugin.settings.recentCount = value; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName("Vorschautext anzeigen / Show preview")
+      .setDesc("Ersten Zeilen der Notiz unterhalb des Datums anzeigen")
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.showPreview)
+          .onChange(async (value) => { this.plugin.settings.showPreview = value; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName("Breadcrumb-Schriftgröße / Breadcrumb font size")
+      .setDesc("Schriftgröße des Breadcrumb-Pfads in Pixeln")
+      .addSlider(slider =>
+        slider.setLimits(10, 18, 1).setValue(this.plugin.settings.breadcrumbFontSize).setDynamicTooltip()
+          .onChange(async (value) => { this.plugin.settings.breadcrumbFontSize = value; await this.plugin.saveSettings(); })
       );
   }
 }
@@ -829,7 +934,10 @@ export default class NoteGalleryPlugin extends Plugin {
         gap: 2px;
         min-width: 0;
       }
-      .note-gallery-favorite-star { font-size: 12px; }
+      .note-gallery-favorite-star {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
       .note-gallery-title {
         font-size: 15px;
         font-weight: 600;
@@ -858,13 +966,6 @@ export default class NoteGalleryPlugin extends Plugin {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-height: 0;
-        opacity: 0;
-        transition: max-height 0.2s ease, opacity 0.2s ease;
-      }
-      .note-gallery-card:hover .note-gallery-preview {
-        max-height: 40px;
-        opacity: 1;
       }
       .note-gallery-thumb {
         flex-shrink: 0;
