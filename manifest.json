@@ -1,9 +1,10 @@
 {
   "id": "note-gallery",
   "name": "Note Gallery",
-  "version": "1.3.3",
-  "minAppVersion": "1.0.0",
-  "description": "Shows notes as cards with image preview, like UpNote.",
-  "author": "Andi",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Browse and manage notes as cards with image preview and favorites support.",
+  "author": "Sh3llingFord",
+  "authorUrl": "https://github.com/Sh3llingFord",
   "isDesktopOnly": false
 }

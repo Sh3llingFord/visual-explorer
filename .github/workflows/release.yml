@@ -39,7 +39,7 @@ jobs:
       - name: Create Release
         run: |
           gh release create ${{ steps.version.outputs.version }} \
-            main.js manifest.json \
+            main.js manifest.json styles.css \
             --title "${{ steps.version.outputs.version }}" \
             --notes "Build from commit ${{ github.sha }}"
         env:
