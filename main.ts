@@ -69,34 +69,6 @@ const STRINGS = {
     newNoteInFolder: "Neue Notiz hier",
     deleteFolderTitle: "Ordner löschen?",
     deleteFolderConfirm: (name: string) => `"${name}" und alle Inhalte werden in den Papierkorb verschoben.`,
-    actions: "Aktionen",
-    backTitle: "Zurück",
-    error: "Fehler",
-    openGallery: "Note Gallery öffnen",
-    openAsGallery: "Als Galerie öffnen",
-    stThumbSize: "Thumbnail-Größe",
-    stThumbSizeDesc: "Breite und Höhe des Vorschaubilds in Pixeln",
-    stFilesFolder: "Dateien-Ordner",
-    stFilesFolderDesc: "Pfad zum Ordner mit Bilddateien (relativ zum Vault-Root)",
-    stSortBy: "Sortierung",
-    stSortByDesc: "Notizen sortieren nach",
-    stSortModified: "Änderungsdatum (neueste zuerst)",
-    stSortCreated: "Erstelldatum (neueste zuerst)",
-    stSortName: "Name (A–Z)",
-    stDateLocale: "Datumsformat",
-    stDateLocaleDesc: "Sprache für die Datumsanzeige",
-    stBackBtnPos: "Zurück-Button Position",
-    stBackBtnPosDesc: "Position des schwebenden Zurück-Buttons",
-    stBackLeft: "Unten links (Rechtshänder)",
-    stBackRight: "Unten rechts (Linkshänder)",
-    stTitleWrap: "Titel umbrechen",
-    stTitleWrapDesc: "Lange Titel umbrechen statt abschneiden",
-    stRecentCount: "Anzahl \"Zuletzt geöffnet\"",
-    stRecentCountDesc: "Wie viele Notizen unter \"Zuletzt geöffnet\" angezeigt werden",
-    stShowPreview: "Vorschautext anzeigen",
-    stShowPreviewDesc: "Ersten Zeilen der Notiz unterhalb des Datums anzeigen",
-    stBreadcrumbSize: "Breadcrumb-Schriftgröße",
-    stBreadcrumbSizeDesc: "Schriftgröße des Breadcrumb-Pfads in Pixeln",
   },
   en: {
     search: "Search…",
@@ -126,34 +98,6 @@ const STRINGS = {
     newNoteInFolder: "New note here",
     deleteFolderTitle: "Delete folder?",
     deleteFolderConfirm: (name: string) => `"${name}" and all its contents will be moved to trash.`,
-    actions: "Actions",
-    backTitle: "Back",
-    error: "Error",
-    openGallery: "Open Note Gallery",
-    openAsGallery: "Open as gallery",
-    stThumbSize: "Thumbnail size",
-    stThumbSizeDesc: "Width and height of the preview image in pixels",
-    stFilesFolder: "Files folder",
-    stFilesFolderDesc: "Path to the folder with image files (relative to vault root)",
-    stSortBy: "Sort by",
-    stSortByDesc: "Criterion for sorting notes",
-    stSortModified: "Date modified (newest first)",
-    stSortCreated: "Date created (newest first)",
-    stSortName: "Name (A–Z)",
-    stDateLocale: "Date format",
-    stDateLocaleDesc: "Language for date display",
-    stBackBtnPos: "Back button position",
-    stBackBtnPosDesc: "Position of the floating back button",
-    stBackLeft: "Bottom left (right-handed)",
-    stBackRight: "Bottom right (left-handed)",
-    stTitleWrap: "Wrap title",
-    stTitleWrapDesc: "Allow long titles to wrap instead of truncating",
-    stRecentCount: "Recently opened count",
-    stRecentCountDesc: "How many notes to show under \"Recently opened\"",
-    stShowPreview: "Show preview",
-    stShowPreviewDesc: "Show the first lines of the note below the date",
-    stBreadcrumbSize: "Breadcrumb font size",
-    stBreadcrumbSizeDesc: "Font size of the breadcrumb path in pixels",
   },
 };
 
@@ -405,7 +349,7 @@ class NoteGalleryView extends ItemView {
             await this.app.workspace.getLeaf(false).openFile(file);
             await this.render();
           } catch (err) {
-            new Notice(STRINGS[this.plugin.settings.language].error + ": " + err);
+            new Notice("Fehler: " + err);
           }
         }
         modal.close();
@@ -475,17 +419,10 @@ class NoteGalleryView extends ItemView {
         window.visualViewport!.removeEventListener('resize', adjustHeight);
     }
 
+    // ── Toolbar ──────────────────────────────────────────────
     const toolbar = container.createDiv({ cls: "note-gallery-toolbar" });
-    this.buildBreadcrumb(toolbar, s, breadcrumbFontSize);
-    this.buildControlsRow(toolbar, container, s, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
 
-    const listContainer = container.createDiv({ cls: "note-gallery-list" });
-    await this.renderList(listContainer, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
-
-    this.buildFloatingBackBtn(container, s, backButtonPosition);
-  }
-
-  private buildBreadcrumb(toolbar: HTMLElement, s: typeof STRINGS["de"], breadcrumbFontSize: number) {
+    // Breadcrumb (only in folder mode)
     if (this.mode === "folder") {
       const breadcrumbEl = toolbar.createDiv({ cls: "note-gallery-breadcrumb" });
       breadcrumbEl.style.fontSize = breadcrumbFontSize + "px";
@@ -505,18 +442,8 @@ class NoteGalleryView extends ItemView {
       modeLabel.createSpan({ cls: "note-gallery-breadcrumb-sep", text: " / " });
       modeLabel.createSpan({ text: this.mode === "recent" ? s.recent : s.favorites });
     }
-  }
 
-  private buildControlsRow(
-    toolbar: HTMLElement,
-    container: HTMLElement,
-    s: typeof STRINGS["de"],
-    filesFolder: string,
-    dateLocale: string,
-    sortBy: string,
-    titleWrap: boolean,
-    thumbnailSize: number
-  ) {
+    // Controls: search + action menu button
     const controls = toolbar.createDiv({ cls: "note-gallery-controls" });
 
     const searchWrapper = controls.createDiv({ cls: "note-gallery-search-wrapper" });
@@ -547,8 +474,9 @@ class NoteGalleryView extends ItemView {
       searchInput.focus();
     });
 
+    // + button → context menu
     const newBtn = controls.createEl("button", { cls: "note-gallery-new-btn", text: "+" });
-    newBtn.title = s.actions;
+    newBtn.title = "Aktionen";
     newBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       showContextMenu(this.app, e, [
@@ -565,7 +493,9 @@ class NoteGalleryView extends ItemView {
         {
           label: s.newDoc,
           icon: "file-plus",
-          action: async () => { await this.createNoteWithName(this.folder.path); }
+          action: async () => {
+            await this.createNoteWithName(this.folder.path);
+          }
         },
         {
           label: s.createFolder,
@@ -580,14 +510,17 @@ class NoteGalleryView extends ItemView {
         },
       ]);
     });
-  }
 
-  private buildFloatingBackBtn(container: HTMLElement, s: typeof STRINGS["de"], backButtonPosition: string) {
+    // ── List ────────────────────────────────────────────────
+    const listContainer = container.createDiv({ cls: "note-gallery-list" });
+    await this.renderList(listContainer, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+
+    // ── Floating Back Button ─────────────────────────────────
     const isRoot = !this.folder.parent || this.folder.path === "/";
     if (!isRoot && this.mode === "folder") {
       const backBtn = container.createDiv({ cls: "note-gallery-back-btn" });
       backBtn.setText("←");
-      backBtn.title = s.backTitle;
+      backBtn.title = "Zurück";
       if (backButtonPosition === "bottom-right") backBtn.addClass("note-gallery-back-btn--right");
       backBtn.addEventListener("click", () => {
         if (this.folder.parent) this.navigateTo(this.folder.parent);
@@ -621,15 +554,7 @@ class NoteGalleryView extends ItemView {
         });
       }
 
-      if (q) files = files.filter(f => {
-        if (f.basename.toLowerCase().includes(q)) return true;
-        const meta = this.app.metadataCache.getFileCache(f);
-        const tags = [
-          ...(Array.isArray(meta?.frontmatter?.tags) ? meta.frontmatter.tags : []),
-          ...(Array.isArray(meta?.frontmatter?.categories) ? meta.frontmatter.categories : []),
-        ];
-        return tags.some(t => String(t).toLowerCase().includes(q));
-      });
+      if (q) files = files.filter(f => f.basename.toLowerCase().includes(q));
 
       // Counter
       const toolbar = this.containerEl.querySelector(".note-gallery-toolbar") as HTMLElement;
@@ -637,7 +562,7 @@ class NoteGalleryView extends ItemView {
       if (existingCounter) existingCounter.remove();
       if (toolbar) {
         const counter = toolbar.createDiv({ cls: "note-gallery-counter" });
-        counter.setText(files.length + " " + s.notes);
+        counter.setText(files.length + " Notizen");
       }
 
       for (const file of files) {
@@ -735,16 +660,7 @@ class NoteGalleryView extends ItemView {
 
     let files = this.folder.children
       .filter((f): f is TFile => f instanceof TFile && f.extension === "md")
-      .filter(f => {
-        if (!q) return true;
-        if (f.basename.toLowerCase().includes(q)) return true;
-        const meta = this.app.metadataCache.getFileCache(f);
-        const tags = [
-          ...(Array.isArray(meta?.frontmatter?.tags) ? meta.frontmatter.tags : []),
-          ...(Array.isArray(meta?.frontmatter?.categories) ? meta.frontmatter.categories : []),
-        ];
-        return tags.some(t => String(t).toLowerCase().includes(q));
-      });
+      .filter(f => !q || f.basename.toLowerCase().includes(q));
 
     files = files.sort((a, b) => {
       if (sortBy === "name") return a.basename.localeCompare(b.basename);
@@ -836,7 +752,7 @@ class NoteGalleryView extends ItemView {
       e.stopPropagation();
       showContextMenu(this.app, e, [
         {
-          label: favorite ? s.removeFavorite : s.addFavorite,
+          label: favorite ? "Favorit entfernen" : "Favorit hinzufügen",
           icon: "star",
           action: async () => {
             await this.app.fileManager.processFrontMatter(file, (fm) => {
@@ -903,39 +819,38 @@ class NoteGallerySettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    const s = STRINGS[this.plugin.settings.language];
     containerEl.createEl("h2", { text: "Note Gallery" });
 
     new Setting(containerEl)
-      .setName(s.stThumbSize)
-      .setDesc(s.stThumbSizeDesc)
+      .setName("Thumbnail-Größe")
+      .setDesc("Breite und Höhe des Vorschaubilds in Pixeln")
       .addSlider(slider =>
         slider.setLimits(40, 160, 8).setValue(this.plugin.settings.thumbnailSize).setDynamicTooltip()
           .onChange(async (value) => { this.plugin.settings.thumbnailSize = value; await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)
-      .setName(s.stFilesFolder)
-      .setDesc(s.stFilesFolderDesc)
+      .setName("Dateien-Ordner")
+      .setDesc("Pfad zum Ordner mit Bilddateien (relativ zum Vault-Root)")
       .addText(text =>
         text.setPlaceholder("Files").setValue(this.plugin.settings.filesFolder)
           .onChange(async (value) => { this.plugin.settings.filesFolder = value.trim(); await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)
-      .setName(s.stSortBy)
-      .setDesc(s.stSortByDesc)
+      .setName("Sortierung")
+      .setDesc("Nach welchem Kriterium Notizen sortiert werden")
       .addDropdown(drop =>
-        drop.addOption("modified", s.stSortModified)
-          .addOption("created", s.stSortCreated)
-          .addOption("name", s.stSortName)
+        drop.addOption("modified", "Änderungsdatum (neueste zuerst)")
+          .addOption("created", "Erstelldatum (neueste zuerst)")
+          .addOption("name", "Name (A–Z)")
           .setValue(this.plugin.settings.sortBy)
           .onChange(async (value) => { this.plugin.settings.sortBy = value as "modified" | "created" | "name"; await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)
-      .setName(s.stDateLocale)
-      .setDesc(s.stDateLocaleDesc)
+      .setName("Datumsformat")
+      .setDesc("Sprache für die Datumsanzeige")
       .addDropdown(drop =>
         drop.addOption("de-DE", "Deutsch (13. Okt. 2024)")
           .addOption("en-US", "English (Oct 13, 2024)")
@@ -945,18 +860,18 @@ class NoteGallerySettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName(s.stBackBtnPos)
-      .setDesc(s.stBackBtnPosDesc)
+      .setName("Zurück-Button Position")
+      .setDesc("Position des floating Zurück-Buttons für Unterordner-Navigation")
       .addDropdown(drop =>
-        drop.addOption("bottom-left", s.stBackLeft)
-          .addOption("bottom-right", s.stBackRight)
+        drop.addOption("bottom-left", "Unten links (Rechtshänder)")
+          .addOption("bottom-right", "Unten rechts (Linkshänder)")
           .setValue(this.plugin.settings.backButtonPosition)
           .onChange(async (value) => { this.plugin.settings.backButtonPosition = value as "bottom-left" | "bottom-right"; await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)
-      .setName(s.stTitleWrap)
-      .setDesc(s.stTitleWrapDesc)
+      .setName("Titel umbrechen")
+      .setDesc("Langen Titeln erlauben umzubrechen statt abzuschneiden")
       .addToggle(toggle =>
         toggle.setValue(this.plugin.settings.titleWrap)
           .onChange(async (value) => { this.plugin.settings.titleWrap = value; await this.plugin.saveSettings(); })
@@ -969,28 +884,28 @@ class NoteGallerySettingTab extends PluginSettingTab {
         drop.addOption("de", "Deutsch")
           .addOption("en", "English")
           .setValue(this.plugin.settings.language)
-          .onChange(async (value) => { this.plugin.settings.language = value as "de" | "en"; await this.plugin.saveSettings(); this.display(); })
+          .onChange(async (value) => { this.plugin.settings.language = value as "de" | "en"; await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)
-      .setName(s.stRecentCount)
-      .setDesc(s.stRecentCountDesc)
+      .setName("Anzahl \"Zuletzt geöffnet\" / Recent count")
+      .setDesc("Wie viele Notizen unter \"Zuletzt geöffnet\" angezeigt werden")
       .addSlider(slider =>
         slider.setLimits(5, 100, 5).setValue(this.plugin.settings.recentCount).setDynamicTooltip()
           .onChange(async (value) => { this.plugin.settings.recentCount = value; await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)
-      .setName(s.stShowPreview)
-      .setDesc(s.stShowPreviewDesc)
+      .setName("Vorschautext anzeigen / Show preview")
+      .setDesc("Ersten Zeilen der Notiz unterhalb des Datums anzeigen")
       .addToggle(toggle =>
         toggle.setValue(this.plugin.settings.showPreview)
           .onChange(async (value) => { this.plugin.settings.showPreview = value; await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)
-      .setName(s.stBreadcrumbSize)
-      .setDesc(s.stBreadcrumbSizeDesc)
+      .setName("Breadcrumb-Schriftgröße / Breadcrumb font size")
+      .setDesc("Schriftgröße des Breadcrumb-Pfads in Pixeln")
       .addSlider(slider =>
         slider.setLimits(10, 18, 1).setValue(this.plugin.settings.breadcrumbFontSize).setDynamicTooltip()
           .onChange(async (value) => { this.plugin.settings.breadcrumbFontSize = value; await this.plugin.saveSettings(); })
@@ -1013,14 +928,13 @@ export default class NoteGalleryPlugin extends Plugin {
 
     this.addSettingTab(new NoteGallerySettingTab(this.app, this));
 
-    const sInit = STRINGS[this.settings.language];
-    this.addRibbonIcon("layout-grid", sInit.openGallery, async () => {
+    this.addRibbonIcon("layout-grid", "Note Gallery öffnen", async () => {
       await this.openGallery(this.app.vault.getRoot());
     });
 
     this.addCommand({
       id: "open-note-gallery",
-      name: sInit.openGallery,
+      name: "Note Gallery öffnen",
       callback: async () => {
         await this.openGallery(this.app.vault.getRoot());
       },
@@ -1030,7 +944,7 @@ export default class NoteGalleryPlugin extends Plugin {
       this.app.workspace.on("file-menu", (menu, file) => {
         if (file instanceof TFolder) {
           menu.addItem((item) => {
-            item.setTitle(STRINGS[this.settings.language].openAsGallery).setIcon("layout-grid")
+            item.setTitle("Als Galerie öffnen").setIcon("layout-grid")
               .onClick(async () => {
                 const leaf = this.app.workspace.getLeaf(true);
                 await leaf.setViewState({
