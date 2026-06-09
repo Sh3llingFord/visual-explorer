@@ -286,6 +286,7 @@ class NoteGalleryView extends ItemView {
   private searchQuery: string = "";
   private breadcrumb: TFolder[] = [];
   private mode: "folder" | "recent" | "favorites" = "folder";
+  private _viewportCleanup?: () => void;
 
   constructor(leaf: WorkspaceLeaf, folder: TFolder, plugin: NoteGalleryPlugin) {
     super(leaf);
@@ -363,6 +364,11 @@ class NoteGalleryView extends ItemView {
     });
   }
 
+  async onClose() {
+    this._viewportCleanup?.();
+    this._viewportCleanup = undefined;
+  }
+
   async navigateTo(folder: TFolder) {
     this.mode = "folder";
     this.folder = folder;
@@ -391,6 +397,9 @@ class NoteGalleryView extends ItemView {
   async render() {
     if (!this.folder) return;
 
+    this._viewportCleanup?.();
+    this._viewportCleanup = undefined;
+
     const { thumbnailSize, filesFolder, dateLocale, sortBy, titleWrap, backButtonPosition, language, breadcrumbFontSize } = this.plugin.settings;
     const s = STRINGS[language];
 
@@ -398,6 +407,17 @@ class NoteGalleryView extends ItemView {
     container.empty();
     container.addClass("note-gallery-container");
     this.containerEl.style.position = "relative";
+
+    if (window.visualViewport) {
+      const adjustHeight = () => {
+        const top = container.getBoundingClientRect().top;
+        container.style.height = (window.visualViewport!.height - top) + 'px';
+      };
+      adjustHeight();
+      window.visualViewport.addEventListener('resize', adjustHeight);
+      this._viewportCleanup = () =>
+        window.visualViewport!.removeEventListener('resize', adjustHeight);
+    }
 
     // ── Toolbar ──────────────────────────────────────────────
     const toolbar = container.createDiv({ cls: "note-gallery-toolbar" });
@@ -461,6 +481,11 @@ class NoteGalleryView extends ItemView {
       e.stopPropagation();
       showContextMenu(this.app, e, [
         {
+          label: s.favorites,
+          icon: "star",
+          action: () => { this.mode = "favorites"; this.searchQuery = ""; this.render(); }
+        },
+        {
           label: s.recent,
           icon: "clock",
           action: () => { this.mode = "recent"; this.searchQuery = ""; this.render(); }
@@ -471,11 +496,6 @@ class NoteGalleryView extends ItemView {
           action: async () => {
             await this.createNoteWithName(this.folder.path);
           }
-        },
-        {
-          label: s.favorites,
-          icon: "star",
-          action: () => { this.mode = "favorites"; this.searchQuery = ""; this.render(); }
         },
         {
           label: s.createFolder,
