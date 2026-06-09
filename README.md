@@ -1,17 +1,17 @@
-# Note Gallery
+# Visual Explorer
 
-A card-based note browser for Obsidian, inspired by UpNote. Displays notes as a list with image thumbnails, category tags, dates, and a text preview — making it easy to visually navigate your vault.
+A card-based note browser for Obsidian. Displays notes as a visual list with image thumbnails, category tags, dates, and a text preview — making it easy to browse and navigate your vault.
 
 ## Features
 
 - **Card view** — each note shows title, category, date, image thumbnail, and optional text preview
 - **Folder navigation** — subfolders appear at the top as clickable entries with a breadcrumb trail
 - **Floating back button** — round button at the bottom (left or right, configurable) to navigate up
-- **Live search** — filter notes and folders by title instantly
+- **Live search** — filter notes and folders by title or tag instantly
 - **+ button → action menu:**
+  - Favorites — shows all notes with `favorite: true` in frontmatter
   - Recently opened — shows the last N modified notes across the vault
   - New document — create a note directly in the current folder
-  - Favorites — shows all notes with `favorite: true` in frontmatter
   - Create folder — create a new subfolder
 - **Long-press (mobile) / right-click (desktop) → context menu:**
   - Add / remove favorite
@@ -21,7 +21,7 @@ A card-based note browser for Obsidian, inspired by UpNote. Displays notes as a 
 - **Note counter** — shows number of notes and subfolders in the toolbar
 - **Auto-refresh** — gallery updates automatically when notes are added, modified, or deleted
 - **State persistence** — remembers the open folder after restarting Obsidian
-- **Ribbon icon + command** — open the gallery without right-clicking a folder
+- **Ribbon icon + command** — open the explorer without right-clicking a folder
 - **Multilingual** — German and English UI
 - **Mobile compatible** — works on Android and iOS
 
@@ -37,27 +37,27 @@ A card-based note browser for Obsidian, inspired by UpNote. Displays notes as a 
 ### Manual installation
 
 1. Download `main.js` and `manifest.json` from the [latest release](https://github.com/Sh3llingFord/obsidian-note-gallery/releases/latest)
-2. Create a folder `.obsidian/plugins/note-gallery/` in your vault
+2. Create a folder `.obsidian/plugins/visual-explorer/` in your vault
 3. Copy both files into that folder
 4. Enable the plugin under **Settings → Community Plugins**
 
 ## Usage
 
-### Opening the gallery
-- **Right-click any folder** in the file explorer → "Als Galerie öffnen"
-- **Ribbon icon** (left sidebar) → opens gallery at vault root
-- **Command palette** → "Note Gallery öffnen"
+### Opening the explorer
+- **Right-click any folder** in the file explorer → "Als Galerie öffnen" / "Open as gallery"
+- **Ribbon icon** (left sidebar) → opens the explorer at vault root
+- **Command palette** → "Visual Explorer öffnen" / "Open Visual Explorer"
 
 ### Navigation
 - **Subfolders** appear at the top with a › chevron and bold name — click to navigate into them
 - **Breadcrumb** at the top left shows the current path — click any segment to go back
 - **Floating ← button** at the bottom — navigates to the parent folder
-- **Search field** filters notes and folders live by title
+- **Search field** filters notes and folders live by title or tag
 
 ### Actions via + button
+- **Favorites** — shows all favorited notes
 - **Recently opened** — shows the last N modified notes vault-wide
 - **New document** — creates a note in the current folder
-- **Favorites** — shows all favorited notes
 - **Create folder** — creates a new subfolder
 
 ### Actions via long-press / right-click on a note

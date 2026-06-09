@@ -1,6 +1,6 @@
 {
-  "id": "note-gallery",
-  "name": "Note Gallery",
+  "id": "visual-explorer",
+  "name": "Visual Explorer",
   "version": "1.0.0",
   "minAppVersion": "1.4.0",
   "description": "Browse and manage notes as cards with image preview and favorites support.",

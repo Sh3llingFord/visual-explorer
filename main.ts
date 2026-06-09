@@ -12,7 +12,7 @@ import {
   Menu,
 } from "obsidian";
 
-const VIEW_TYPE = "note-gallery";
+const VIEW_TYPE = "visual-explorer";
 
 interface NoteGallerySettings {
   thumbnailSize: number;
@@ -72,7 +72,7 @@ const STRINGS = {
     actions: "Aktionen",
     backTitle: "Zurück",
     error: "Fehler",
-    openGallery: "Note Gallery öffnen",
+    openGallery: "Visual Explorer öffnen",
     openAsGallery: "Als Galerie öffnen",
     stThumbSize: "Thumbnail-Größe",
     stThumbSizeDesc: "Breite und Höhe des Vorschaubilds in Pixeln",
@@ -129,7 +129,7 @@ const STRINGS = {
     actions: "Actions",
     backTitle: "Back",
     error: "Error",
-    openGallery: "Open Note Gallery",
+    openGallery: "Open Visual Explorer",
     openAsGallery: "Open as gallery",
     stThumbSize: "Thumbnail size",
     stThumbSizeDesc: "Width and height of the preview image in pixels",
@@ -351,7 +351,7 @@ class NoteGalleryView extends ItemView {
   }
 
   getViewType() { return VIEW_TYPE; }
-  getDisplayText() { return "Note Gallery"; }
+  getDisplayText() { return "Visual Explorer"; }
   getIcon() { return "layout-grid"; }
 
   getState(): Record<string, unknown> {
