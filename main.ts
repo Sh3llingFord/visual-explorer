@@ -786,11 +786,12 @@ class NoteGalleryView extends ItemView {
             icon: "arrow-up-right",
             action: async () => {
               const newLeaf = this.app.workspace.getLeaf("tab");
+              // Set state WITHOUT activating so nav buttons haven't rendered yet
               await newLeaf.setViewState({
                 type: VIEW_TYPE,
-                active: true,
                 state: { folderPath: subfolder.path },
               });
+              // Inject history while leaf is still inactive
               const leafHistory = (newLeaf as any).history;
               if (leafHistory?.backHistory != null) {
                 leafHistory.backHistory = [{
@@ -798,8 +799,9 @@ class NoteGalleryView extends ItemView {
                   eState: null,
                 }];
                 leafHistory.forwardHistory = [];
-                this.app.workspace.trigger("layout-change");
               }
+              // Activate leaf now — Obsidian reads history when rendering nav buttons
+              this.app.workspace.setActiveLeaf(newLeaf, { focus: true });
             }
           },
           {
