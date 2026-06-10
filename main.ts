@@ -786,17 +786,19 @@ class NoteGalleryView extends ItemView {
             icon: "arrow-up-right",
             action: async () => {
               const newLeaf = this.app.workspace.getLeaf("tab");
-              // Set parent gallery first so Obsidian records it in back history
-              await newLeaf.setViewState({
-                type: VIEW_TYPE,
-                state: { folderPath: this.folder?.path ?? "" },
-              });
-              // Navigate to subfolder — Obsidian pushes the parent state to backHistory
               await newLeaf.setViewState({
                 type: VIEW_TYPE,
                 active: true,
                 state: { folderPath: subfolder.path },
               });
+              const leafHistory = (newLeaf as any).history;
+              if (leafHistory?.backHistory != null) {
+                leafHistory.backHistory = [{
+                  state: { type: VIEW_TYPE, state: { folderPath: this.folder?.path ?? "" }, active: true },
+                  eState: null,
+                }];
+                leafHistory.forwardHistory = [];
+              }
             }
           },
           {
