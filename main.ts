@@ -369,14 +369,14 @@ class NoteGalleryView extends ItemView {
       const found = this.app.vault.getAbstractFileByPath(path);
       if (found instanceof TFolder) {
         this.folder = found;
-        this.breadcrumb = this.buildBreadcrumb(found);
+        this.breadcrumb = this.computeBreadcrumb(found);
       }
     }
     this.load();
     await this.render();
   }
 
-  buildBreadcrumb(folder: TFolder): TFolder[] {
+  computeBreadcrumb(folder: TFolder): TFolder[] {
     const crumbs: TFolder[] = [];
     let current: TFolder | null = folder;
     while (current) {
@@ -433,7 +433,7 @@ class NoteGalleryView extends ItemView {
     this.mode = "folder";
     this.folder = folder;
     this.folderPath = folder.path;
-    this.breadcrumb = this.buildBreadcrumb(folder);
+    this.breadcrumb = this.computeBreadcrumb(folder);
     this.searchQuery = "";
     await this.render();
   }
