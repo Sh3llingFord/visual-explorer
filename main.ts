@@ -25,6 +25,7 @@ interface NoteGallerySettings {
   recentCount: number;
   showPreview: boolean;
   breadcrumbFontSize: number;
+  previewLines: 1 | 2;
 }
 
 const DEFAULT_SETTINGS: NoteGallerySettings = {
@@ -38,6 +39,7 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   recentCount: 30,
   showPreview: true,
   breadcrumbFontSize: 12,
+  previewLines: 1,
 };
 
 const STRINGS = {
@@ -98,6 +100,8 @@ const STRINGS = {
     stShowPreviewDesc: "Ersten Zeilen der Notiz unterhalb des Datums anzeigen",
     stBreadcrumbSize: "Breadcrumb-Schriftgröße",
     stBreadcrumbSizeDesc: "Schriftgröße des Breadcrumb-Pfads in Pixeln",
+    stPreviewLines: "Vorschautext-Zeilen",
+    stPreviewLinesDesc: "Wie viele Zeilen des Vorschautexts angezeigt werden (1 oder 2)",
     stSectionGeneral: "Allgemein",
     stSectionCard: "Kartenanzeige",
     stSectionSort: "Sortierung & Ansichten",
@@ -161,6 +165,8 @@ const STRINGS = {
     stShowPreviewDesc: "Show the first lines of the note below the date",
     stBreadcrumbSize: "Breadcrumb font size",
     stBreadcrumbSizeDesc: "Font size of the breadcrumb path in pixels",
+    stPreviewLines: "Preview text lines",
+    stPreviewLinesDesc: "How many lines of preview text to show (1 or 2)",
     stSectionGeneral: "General",
     stSectionCard: "Card Display",
     stSectionSort: "Sorting & Views",
@@ -199,9 +205,9 @@ function extractPreviewText(content: string): string {
 
 function extractCategories(frontmatter: Record<string, unknown>): string {
   const cats = frontmatter?.categories;
-  if (Array.isArray(cats) && cats.length > 0) return "#" + cats[0];
+  if (Array.isArray(cats) && cats.length > 0) return cats.map((c: unknown) => "#" + c).join(" · ");
   const tags = frontmatter?.tags;
-  if (Array.isArray(tags) && tags.length > 0) return "#" + tags[0];
+  if (Array.isArray(tags) && tags.length > 0) return tags.map((t: unknown) => "#" + t).join(" · ");
   return "";
 }
 
@@ -386,6 +392,8 @@ class NoteGalleryView extends ItemView {
         this.breadcrumb = this.computeBreadcrumb(found);
       }
     }
+    this.mode = "folder";
+    this.searchQuery = "";
     this.load();
     await this.render();
   }
@@ -444,12 +452,10 @@ class NoteGalleryView extends ItemView {
   }
 
   async navigateTo(folder: TFolder) {
-    this.mode = "folder";
-    this.folder = folder;
-    this.folderPath = folder.path;
-    this.breadcrumb = this.computeBreadcrumb(folder);
-    this.searchQuery = "";
-    await this.render();
+    await this.leaf.setViewState({
+      type: VIEW_TYPE,
+      state: { folderPath: folder.path },
+    });
   }
 
   async onOpen() {
@@ -496,6 +502,9 @@ class NoteGalleryView extends ItemView {
     const toolbar = container.createDiv({ cls: "note-gallery-toolbar" });
     this.buildBreadcrumb(toolbar, s, breadcrumbFontSize);
     this.buildControlsRow(toolbar, container, s, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+
+    const allTags = this.collectTagsForCurrentView();
+    if (allTags.length > 0) this.buildTagChips(toolbar, allTags);
 
     const listContainer = container.createDiv({ cls: "note-gallery-list" });
     await this.renderList(listContainer, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
@@ -554,6 +563,15 @@ class NoteGalleryView extends ItemView {
       clearBtn.style.display = this.searchQuery ? "flex" : "none";
       const lc = container.querySelector(".note-gallery-list") as HTMLElement;
       if (lc) await this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+    });
+
+    searchInput.addEventListener("keydown", async (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        this.searchQuery = "";
+        searchInput.value = "";
+        clearBtn.style.display = "none";
+        await this.render();
+      }
     });
 
     clearBtn.addEventListener("click", async () => {
@@ -753,6 +771,12 @@ class NoteGalleryView extends ItemView {
         ]);
       };
 
+      card.setAttribute("tabindex", "0");
+      card.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Enter") { card.click(); }
+        if (e.key === "ArrowDown") { e.preventDefault(); const next = card.nextElementSibling as HTMLElement; if (next?.classList.contains("note-gallery-card")) next.focus(); }
+        if (e.key === "ArrowUp") { e.preventDefault(); const prev = card.previousElementSibling as HTMLElement; if (prev?.classList.contains("note-gallery-card")) prev.focus(); }
+      });
       card.addEventListener("contextmenu", (e) => openFolderMenu(e));
       let longPressTimer: ReturnType<typeof setTimeout>;
       card.addEventListener("touchstart", (e) => { longPressTimer = setTimeout(() => openFolderMenu(e), 500); }, { passive: true });
@@ -808,7 +832,7 @@ class NoteGalleryView extends ItemView {
     titleWrap: boolean,
     thumbnailSize: number
   ) {
-    const { language, showPreview } = this.plugin.settings;
+    const { language, showPreview, previewLines } = this.plugin.settings;
     const s = STRINGS[language];
     const content = await this.app.vault.read(file);
     const cache = this.app.metadataCache.getFileCache(file);
@@ -832,7 +856,10 @@ class NoteGalleryView extends ItemView {
 
     if (category) textDiv.createDiv({ cls: "note-gallery-category", text: category });
     textDiv.createDiv({ cls: "note-gallery-date", text: dateStr });
-    if (showPreview && previewText) textDiv.createDiv({ cls: "note-gallery-preview", text: previewText });
+    if (showPreview && previewText) {
+      const previewEl = textDiv.createDiv({ text: previewText });
+      previewEl.addClass(previewLines === 2 ? "note-gallery-preview--two-lines" : "note-gallery-preview");
+    }
 
     // Right: image
     if (imgPath) {
@@ -903,6 +930,13 @@ class NoteGalleryView extends ItemView {
         },
       ]);
     };
+
+    card.setAttribute("tabindex", "0");
+    card.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Enter") { card.click(); }
+      if (e.key === "ArrowDown") { e.preventDefault(); const next = card.nextElementSibling as HTMLElement; if (next?.classList.contains("note-gallery-card")) next.focus(); }
+      if (e.key === "ArrowUp") { e.preventDefault(); const prev = card.previousElementSibling as HTMLElement; if (prev?.classList.contains("note-gallery-card")) prev.focus(); }
+    });
 
     // Desktop: right-click
     card.addEventListener("contextmenu", (e) => openCardMenu(e));
@@ -988,6 +1022,13 @@ class NoteGalleryView extends ItemView {
       ]);
     };
 
+    card.setAttribute("tabindex", "0");
+    card.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Enter") { card.click(); }
+      if (e.key === "ArrowDown") { e.preventDefault(); const next = card.nextElementSibling as HTMLElement; if (next?.classList.contains("note-gallery-card")) next.focus(); }
+      if (e.key === "ArrowUp") { e.preventDefault(); const prev = card.previousElementSibling as HTMLElement; if (prev?.classList.contains("note-gallery-card")) prev.focus(); }
+    });
+
     card.addEventListener("contextmenu", (e) => openCardMenu(e));
     let longPressTimer: ReturnType<typeof setTimeout>;
     card.addEventListener("touchstart", (e) => {
@@ -999,6 +1040,48 @@ class NoteGalleryView extends ItemView {
     card.addEventListener("click", () => {
       this.app.workspace.getLeaf(false).openFile(file);
     });
+  }
+
+  private collectTagsForCurrentView(): string[] {
+    const allTags = new Set<string>();
+    let files: TFile[];
+
+    if (this.mode === "folder") {
+      files = this.folder.children
+        .filter((f): f is TFile => f instanceof TFile && f.extension === "md");
+    } else if (this.mode === "recent") {
+      files = this.app.vault.getMarkdownFiles()
+        .sort((a, b) => b.stat.mtime - a.stat.mtime)
+        .slice(0, this.plugin.settings.recentCount);
+    } else {
+      files = this.app.vault.getMarkdownFiles().filter(f => {
+        const cache = this.app.metadataCache.getFileCache(f);
+        return isFavorite((cache?.frontmatter ?? {}) as Record<string, unknown>);
+      });
+    }
+
+    for (const file of files) {
+      const cache = this.app.metadataCache.getFileCache(file);
+      const cats = cache?.frontmatter?.categories;
+      const tags = cache?.frontmatter?.tags;
+      if (Array.isArray(cats)) cats.forEach((c: unknown) => allTags.add(String(c)));
+      if (Array.isArray(tags)) tags.forEach((t: unknown) => allTags.add(String(t)));
+    }
+
+    return [...allTags].sort();
+  }
+
+  private buildTagChips(toolbar: HTMLElement, tags: string[]) {
+    const chipsRow = toolbar.createDiv({ cls: "note-gallery-tag-chips" });
+    for (const tag of tags) {
+      const chip = chipsRow.createSpan({ cls: "note-gallery-tag-chip" });
+      chip.setText("#" + tag);
+      if (this.searchQuery === tag) chip.addClass("note-gallery-tag-chip--active");
+      chip.addEventListener("click", () => {
+        this.searchQuery = this.searchQuery === tag ? "" : tag;
+        this.render();
+      });
+    }
   }
 }
 
@@ -1051,6 +1134,16 @@ class NoteGallerySettingTab extends PluginSettingTab {
       .addToggle(toggle =>
         toggle.setValue(this.plugin.settings.showPreview)
           .onChange(async (value) => { this.plugin.settings.showPreview = value; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stPreviewLines)
+      .setDesc(s.stPreviewLinesDesc)
+      .addDropdown(drop =>
+        drop.addOption("1", "1")
+          .addOption("2", "2")
+          .setValue(String(this.plugin.settings.previewLines))
+          .onChange(async (value) => { this.plugin.settings.previewLines = Number(value) as 1 | 2; await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)

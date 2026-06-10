@@ -161,6 +161,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.note-gallery-preview--two-lines {
+  font-size: 12px;
+  color: var(--text-faint);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+}
 .note-gallery-thumb {
   flex-shrink: 0;
   border-radius: 6px;
@@ -211,6 +220,29 @@
   box-sizing: border-box;
 }
 
+.note-gallery-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-bottom: 2px;
+}
+.note-gallery-tag-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.note-gallery-tag-chip:hover {
+  background: var(--background-modifier-border-hover);
+  color: var(--text-normal);
+}
+.note-gallery-tag-chip--active {
+  background: var(--interactive-accent);
+  color: white;
+}
 .note-gallery-settings-section {
   margin-top: 24px;
   margin-bottom: 4px;
