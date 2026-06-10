@@ -26,6 +26,7 @@ interface NoteGallerySettings {
   breadcrumbFontSize: number;
   previewLines: 1 | 2;
   sortFavoritesFirst: boolean;
+  openOnStartup: boolean;
 }
 
 const DEFAULT_SETTINGS: NoteGallerySettings = {
@@ -40,6 +41,7 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   breadcrumbFontSize: 12,
   previewLines: 1,
   sortFavoritesFirst: false,
+  openOnStartup: false,
 };
 
 const STRINGS = {
@@ -99,6 +101,8 @@ const STRINGS = {
     stPreviewLinesDesc: "Wie viele Zeilen des Vorschautexts angezeigt werden (1 oder 2)",
     stSortFavFirst: "Favoriten zuerst",
     stSortFavFirstDesc: "Favoriten werden in der Ordneransicht oben angezeigt",
+    stOpenOnStartup: "Beim Start öffnen",
+    stOpenOnStartupDesc: "Visual Explorer automatisch beim Start von Obsidian öffnen",
     stSectionGeneral: "Allgemein",
     stSectionCard: "Kartenanzeige",
     stSectionSort: "Sortierung & Ansichten",
@@ -162,6 +166,8 @@ const STRINGS = {
     stPreviewLinesDesc: "How many lines of preview text to show (1 or 2)",
     stSortFavFirst: "Favorites first",
     stSortFavFirstDesc: "Show favorites at the top of the folder view",
+    stOpenOnStartup: "Open on startup",
+    stOpenOnStartupDesc: "Automatically open Visual Explorer when Obsidian starts",
     stSectionGeneral: "General",
     stSectionCard: "Card Display",
     stSectionSort: "Sorting & Views",
@@ -1213,6 +1219,14 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .onChange(async (value) => { this.plugin.settings.dateLocale = value; await this.plugin.saveSettings(); })
       );
 
+    new Setting(containerEl)
+      .setName(s.stOpenOnStartup)
+      .setDesc(s.stOpenOnStartupDesc)
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.openOnStartup)
+          .onChange(async (value) => { this.plugin.settings.openOnStartup = value; await this.plugin.saveSettings(); })
+      );
+
     // ── Kartenanzeige / Card Display ──────────────────────────────
     containerEl.createEl("h3", { text: s.stSectionCard, cls: "note-gallery-settings-section" });
 
@@ -1316,6 +1330,12 @@ export default class NoteGalleryPlugin extends Plugin {
 
     this.addSettingTab(new NoteGallerySettingTab(this.app, this));
 
+    this.app.workspace.onLayoutReady(() => {
+      if (this.settings.openOnStartup) {
+        this.activateView();
+      }
+    });
+
     const sInit = STRINGS[this.settings.language];
     this.addRibbonIcon("layout-grid", sInit.openGallery, async () => {
       await this.openGallery(this.app.vault.getRoot());
@@ -1347,6 +1367,16 @@ export default class NoteGalleryPlugin extends Plugin {
       })
     );
 
+  }
+
+  async activateView() {
+    const { workspace } = this.app;
+    let leaf = workspace.getLeavesOfType(VIEW_TYPE)[0];
+    if (!leaf) {
+      leaf = workspace.getLeaf(false);
+      await leaf.setViewState({ type: VIEW_TYPE, active: true });
+    }
+    workspace.revealLeaf(leaf);
   }
 
   async openGallery(folder: TFolder) {
