@@ -61,6 +61,7 @@ const STRINGS = {
     createFolderPlaceholder: "Ordnername",
     createFolderConfirm: "Erstellen",
     notes: "Notizen",
+    files: "Dateien",
     subfolders: "Unterordner",
     deleted: (name: string) => `"${name}" gelöscht`,
     newNote: (date: string) => `Neue Notiz ${date}`,
@@ -118,6 +119,7 @@ const STRINGS = {
     createFolderPlaceholder: "Folder name",
     createFolderConfirm: "Create",
     notes: "Notes",
+    files: "Files",
     subfolders: "Subfolders",
     deleted: (name: string) => `"${name}" deleted`,
     newNote: (date: string) => `New note ${date}`,
@@ -158,6 +160,8 @@ const STRINGS = {
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
 
 function extractFirstImage(content: string): string | null {
   const wikiMatch = content.match(/!\[\[([^\]]+\.(png|jpg|jpeg|gif|webp))[^\]]*\]\]/i);
@@ -660,9 +664,9 @@ class NoteGalleryView extends ItemView {
       chevron.setText("›");
       const textDiv = card.createDiv({ cls: "note-gallery-text" });
       textDiv.createDiv({ cls: "note-gallery-title note-gallery-folder-title", text: subfolder.name });
-      const fileCount = subfolder.children.filter(f => f instanceof TFile && (f as TFile).extension === "md").length;
+      const fileCount = subfolder.children.filter(f => f instanceof TFile).length;
       const folderCount = subfolder.children.filter(f => f instanceof TFolder).length;
-      const meta = [fileCount + " " + s.notes, folderCount > 0 ? folderCount + " " + s.subfolders : ""].filter(Boolean).join(" · ");
+      const meta = [fileCount + " " + s.files, folderCount > 0 ? folderCount + " " + s.subfolders : ""].filter(Boolean).join(" · ");
       textDiv.createDiv({ cls: "note-gallery-date", text: meta });
 
       const openFolderMenu = (e: MouseEvent | TouchEvent) => {
@@ -734,10 +738,10 @@ class NoteGalleryView extends ItemView {
     }
 
     let files = this.folder.children
-      .filter((f): f is TFile => f instanceof TFile && f.extension === "md")
+      .filter((f): f is TFile => f instanceof TFile)
       .filter(f => {
         if (!q) return true;
-        if (f.basename.toLowerCase().includes(q)) return true;
+        if (f.name.toLowerCase().includes(q)) return true;
         const meta = this.app.metadataCache.getFileCache(f);
         const tags = [
           ...(Array.isArray(meta?.frontmatter?.tags) ? meta.frontmatter.tags : []),
@@ -758,11 +762,15 @@ class NoteGalleryView extends ItemView {
     if (existingCounter) existingCounter.remove();
     if (toolbar) {
       const counter = toolbar.createDiv({ cls: "note-gallery-counter" });
-      counter.setText(files.length + " " + s.notes + (subfolders.length > 0 ? ` · ${subfolders.length} ` + s.subfolders : ""));
+      counter.setText(files.length + " " + s.files + (subfolders.length > 0 ? ` · ${subfolders.length} ` + s.subfolders : ""));
     }
 
     for (const file of files) {
-      await this.renderNoteCard(listContainer, file, filesFolder, dateLocale, titleWrap, thumbnailSize);
+      if (file.extension === "md") {
+        await this.renderNoteCard(listContainer, file, filesFolder, dateLocale, titleWrap, thumbnailSize);
+      } else {
+        await this.renderFileCard(listContainer, file, dateLocale, titleWrap, thumbnailSize);
+      }
     }
 
     listContainer.createDiv({ cls: "note-gallery-list-spacer" });
@@ -884,6 +892,86 @@ class NoteGalleryView extends ItemView {
     card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
 
     // Open note on tap/click
+    card.addEventListener("click", () => {
+      this.app.workspace.getLeaf(false).openFile(file);
+    });
+  }
+
+  async renderFileCard(
+    listContainer: HTMLElement,
+    file: TFile,
+    dateLocale: string,
+    titleWrap: boolean,
+    thumbnailSize: number
+  ) {
+    const { language } = this.plugin.settings;
+    const s = STRINGS[language];
+
+    const isImage = IMAGE_EXTS.has(file.extension.toLowerCase());
+    const dateStr = new Date(file.stat.mtime).toLocaleDateString(dateLocale, {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+
+    const card = listContainer.createDiv({ cls: "note-gallery-card" });
+
+    const textDiv = card.createDiv({ cls: "note-gallery-text" });
+    const titleRow = textDiv.createDiv({ cls: "note-gallery-title-row" });
+    const titleEl = titleRow.createSpan({ cls: "note-gallery-title" });
+    titleEl.setText(file.name);
+    if (titleWrap) titleEl.addClass("note-gallery-title--wrap");
+
+    textDiv.createDiv({ cls: "note-gallery-category", text: file.extension.toUpperCase() });
+    textDiv.createDiv({ cls: "note-gallery-date", text: dateStr });
+
+    if (isImage) {
+      const imgDiv = card.createDiv({ cls: "note-gallery-thumb" });
+      imgDiv.style.width = thumbnailSize + "px";
+      imgDiv.style.height = thumbnailSize + "px";
+      const url = this.app.vault.getResourcePath(file);
+      const img = imgDiv.createEl("img");
+      img.src = url;
+      img.alt = file.name;
+    }
+
+    const openCardMenu = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenu(this.app, e, [
+        {
+          label: s.rename,
+          icon: "pencil",
+          action: () => {
+            new RenameModal(this.app, file, s, async (newName) => {
+              const newPath = file.parent?.path + "/" + newName + "." + file.extension;
+              await this.app.fileManager.renameFile(file, newPath);
+              await this.render();
+            }).open();
+          }
+        },
+        {
+          label: s.delete,
+          icon: "trash",
+          danger: true,
+          action: () => {
+            new ConfirmDeleteModal(this.app, file.name, s, async () => {
+              await this.app.vault.trash(file, true);
+              new Notice(s.deleted(file.name));
+              await this.render();
+            }).open();
+          }
+        },
+      ]);
+    };
+
+    card.addEventListener("contextmenu", (e) => openCardMenu(e));
+    let longPressTimer: ReturnType<typeof setTimeout>;
+    card.addEventListener("touchstart", (e) => {
+      longPressTimer = setTimeout(() => openCardMenu(e), 500);
+    }, { passive: true });
+    card.addEventListener("touchend", () => clearTimeout(longPressTimer));
+    card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
+
     card.addEventListener("click", () => {
       this.app.workspace.getLeaf(false).openFile(file);
     });
