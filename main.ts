@@ -512,6 +512,11 @@ class NoteGalleryView extends ItemView {
   async navigateTo(folder: TFolder) {
     await this.leaf.setViewState({
       type: VIEW_TYPE,
+      state: { folderPath: this.folder?.path ?? "" },
+    });
+    await this.leaf.setViewState({
+      type: VIEW_TYPE,
+      active: true,
       state: { folderPath: folder.path },
     });
   }
