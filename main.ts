@@ -510,11 +510,24 @@ class NoteGalleryView extends ItemView {
   }
 
   async navigateTo(folder: TFolder) {
+    // setViewState({active:true}) on an already-active leaf does not record history.
+    // Push current state manually, then update the view without the active flag
+    // so Obsidian doesn't overwrite the history we just wrote.
+    const leafHistory = (this.leaf as any).history;
+    if (leafHistory != null) {
+      if (!leafHistory.backHistory) leafHistory.backHistory = [];
+      leafHistory.backHistory.push({
+        state: { type: VIEW_TYPE, state: { folderPath: this.folder?.path ?? "" }, active: true },
+        eState: null,
+      });
+      leafHistory.forwardHistory = [];
+    }
     await this.leaf.setViewState({
       type: VIEW_TYPE,
-      active: true,
       state: { folderPath: folder.path },
     });
+    // Re-fire active-leaf-change so Obsidian re-evaluates the nav button states
+    this.app.workspace.trigger("active-leaf-change", this.leaf);
   }
 
   async onOpen() {
