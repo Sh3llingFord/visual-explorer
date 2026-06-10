@@ -210,3 +210,15 @@
   margin-top: 8px;
   box-sizing: border-box;
 }
+
+.note-gallery-settings-section {
+  margin-top: 24px;
+  margin-bottom: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
