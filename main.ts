@@ -465,6 +465,7 @@ class NoteGalleryView extends ItemView {
     this.searchQuery = "";
     this.load();
     await this.render();
+    await super.setState(state, result);
   }
 
   computeBreadcrumb(folder: TFolder): TFolder[] {
@@ -803,6 +804,26 @@ class NoteGalleryView extends ItemView {
             }
           },
           {
+            label: s.openInNewTab,
+            icon: "arrow-up-right",
+            action: async () => {
+              const newLeaf = this.app.workspace.getLeaf("tab");
+              await newLeaf.setViewState({
+                type: VIEW_TYPE,
+                active: true,
+                state: { folderPath: subfolder.path },
+              });
+              const leafHistory = (newLeaf as any).history;
+              if (leafHistory?.backHistory != null) {
+                leafHistory.backHistory = [{
+                  state: { type: VIEW_TYPE, state: { folderPath: this.folder?.path ?? "" }, active: true },
+                  eState: null,
+                }];
+                leafHistory.forwardHistory = [];
+              }
+            }
+          },
+          {
             label: s.deleteFolder,
             icon: "trash",
             danger: true,
@@ -973,18 +994,6 @@ class NoteGalleryView extends ItemView {
           }
         },
         {
-          label: s.delete,
-          icon: "trash",
-          danger: true,
-          action: () => {
-            new ConfirmDeleteModal(this.app, file.basename, s, async () => {
-              await this.app.vault.trash(file, true);
-              new Notice(s.deleted(file.basename));
-              await this.render();
-            }).open();
-          }
-        },
-        {
           label: s.openInNewTab,
           icon: "arrow-up-right",
           action: async () => {
@@ -998,6 +1007,18 @@ class NoteGalleryView extends ItemView {
               }];
               leafHistory.forwardHistory = [];
             }
+          }
+        },
+        {
+          label: s.delete,
+          icon: "trash",
+          danger: true,
+          action: () => {
+            new ConfirmDeleteModal(this.app, file.basename, s, async () => {
+              await this.app.vault.trash(file, true);
+              new Notice(s.deleted(file.basename));
+              await this.render();
+            }).open();
           }
         },
       ]);
@@ -1080,18 +1101,6 @@ class NoteGalleryView extends ItemView {
           }
         },
         {
-          label: s.delete,
-          icon: "trash",
-          danger: true,
-          action: () => {
-            new ConfirmDeleteModal(this.app, file.name, s, async () => {
-              await this.app.vault.trash(file, true);
-              new Notice(s.deleted(file.name));
-              await this.render();
-            }).open();
-          }
-        },
-        {
           label: s.openInNewTab,
           icon: "arrow-up-right",
           action: async () => {
@@ -1105,6 +1114,18 @@ class NoteGalleryView extends ItemView {
               }];
               leafHistory.forwardHistory = [];
             }
+          }
+        },
+        {
+          label: s.delete,
+          icon: "trash",
+          danger: true,
+          action: () => {
+            new ConfirmDeleteModal(this.app, file.name, s, async () => {
+              await this.app.vault.trash(file, true);
+              new Notice(s.deleted(file.name));
+              await this.render();
+            }).open();
           }
         },
       ]);
