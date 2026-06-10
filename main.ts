@@ -20,7 +20,6 @@ interface NoteGallerySettings {
   dateLocale: string;
   sortBy: "modified" | "created" | "name";
   titleWrap: boolean;
-  backButtonPosition: "bottom-left" | "bottom-right";
   language: "de" | "en";
   recentCount: number;
   showPreview: boolean;
@@ -35,7 +34,6 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   dateLocale: "de-DE",
   sortBy: "modified",
   titleWrap: false,
-  backButtonPosition: "bottom-left",
   language: "de",
   recentCount: 30,
   showPreview: true,
@@ -75,7 +73,6 @@ const STRINGS = {
     deleteFolderTitle: "Ordner löschen?",
     deleteFolderConfirm: (name: string) => `"${name}" und alle Inhalte werden in den Papierkorb verschoben.`,
     actions: "Aktionen",
-    backTitle: "Zurück",
     error: "Fehler",
     openGallery: "Visual Explorer öffnen",
     openAsGallery: "Als Galerie öffnen",
@@ -90,10 +87,6 @@ const STRINGS = {
     stSortName: "Name (A–Z)",
     stDateLocale: "Datumsformat",
     stDateLocaleDesc: "Sprache für die Datumsanzeige",
-    stBackBtnPos: "Zurück-Button Position",
-    stBackBtnPosDesc: "Position des schwebenden Zurück-Buttons",
-    stBackLeft: "Unten links (Rechtshänder)",
-    stBackRight: "Unten rechts (Linkshänder)",
     stTitleWrap: "Titel umbrechen",
     stTitleWrapDesc: "Lange Titel umbrechen statt abschneiden",
     stRecentCount: "Anzahl \"Zuletzt geöffnet\"",
@@ -143,7 +136,6 @@ const STRINGS = {
     deleteFolderTitle: "Delete folder?",
     deleteFolderConfirm: (name: string) => `"${name}" and all its contents will be moved to trash.`,
     actions: "Actions",
-    backTitle: "Back",
     error: "Error",
     openGallery: "Open Visual Explorer",
     openAsGallery: "Open as gallery",
@@ -158,10 +150,6 @@ const STRINGS = {
     stSortName: "Name (A–Z)",
     stDateLocale: "Date format",
     stDateLocaleDesc: "Language for date display",
-    stBackBtnPos: "Back button position",
-    stBackBtnPosDesc: "Position of the floating back button",
-    stBackLeft: "Bottom left (right-handed)",
-    stBackRight: "Bottom right (left-handed)",
     stTitleWrap: "Wrap title",
     stTitleWrapDesc: "Allow long titles to wrap instead of truncating",
     stRecentCount: "Recently opened count",
@@ -550,7 +538,7 @@ class NoteGalleryView extends ItemView {
     this._viewportCleanup?.();
     this._viewportCleanup = undefined;
 
-    const { thumbnailSize, filesFolder, dateLocale, sortBy, titleWrap, backButtonPosition, language, breadcrumbFontSize } = this.plugin.settings;
+    const { thumbnailSize, filesFolder, dateLocale, sortBy, titleWrap, language, breadcrumbFontSize } = this.plugin.settings;
     const s = STRINGS[language];
 
     const container = this.containerEl.children[1] as HTMLElement;
@@ -578,8 +566,6 @@ class NoteGalleryView extends ItemView {
 
     const listContainer = container.createDiv({ cls: "note-gallery-list" });
     await this.renderList(listContainer, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
-
-    this.buildFloatingBackBtn(container, s, backButtonPosition);
   }
 
   private buildBreadcrumb(toolbar: HTMLElement, s: typeof STRINGS["de"], breadcrumbFontSize: number) {
@@ -698,19 +684,6 @@ class NoteGalleryView extends ItemView {
     });
   }
 
-  private buildFloatingBackBtn(container: HTMLElement, s: typeof STRINGS["de"], backButtonPosition: string) {
-    const isRoot = !this.folder.parent || this.folder.path === "/";
-    if (!isRoot && this.mode === "folder") {
-      const backBtn = container.createDiv({ cls: "note-gallery-back-btn" });
-      backBtn.setText("←");
-      backBtn.title = s.backTitle;
-      if (backButtonPosition === "bottom-right") backBtn.addClass("note-gallery-back-btn--right");
-      backBtn.addEventListener("click", () => {
-        if (this.folder.parent) this.navigateTo(this.folder.parent);
-      });
-    }
-  }
-
   async renderList(
     listContainer: HTMLElement,
     filesFolder: string,
@@ -814,7 +787,7 @@ class NoteGalleryView extends ItemView {
                 state: { folderPath: subfolder.path },
               });
               const leafHistory = (newLeaf as any).history;
-              if (leafHistory?.backHistory != null) {
+              if (leafHistory != null) {
                 leafHistory.backHistory = [{
                   state: { type: VIEW_TYPE, state: { folderPath: this.folder?.path ?? "" }, active: true },
                   eState: null,
@@ -1311,16 +1284,6 @@ class NoteGallerySettingTab extends PluginSettingTab {
 
     // ── Navigation & Layout ───────────────────────────────────────
     containerEl.createEl("h3", { text: s.stSectionNav, cls: "note-gallery-settings-section" });
-
-    new Setting(containerEl)
-      .setName(s.stBackBtnPos)
-      .setDesc(s.stBackBtnPosDesc)
-      .addDropdown(drop =>
-        drop.addOption("bottom-left", s.stBackLeft)
-          .addOption("bottom-right", s.stBackRight)
-          .setValue(this.plugin.settings.backButtonPosition)
-          .onChange(async (value) => { this.plugin.settings.backButtonPosition = value as "bottom-left" | "bottom-right"; await this.plugin.saveSettings(); })
-      );
 
     new Setting(containerEl)
       .setName(s.stBreadcrumbSize)
