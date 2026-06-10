@@ -111,6 +111,7 @@ const STRINGS = {
     stSectionSort: "Sortierung & Ansichten",
     stSectionNav: "Navigation & Layout",
     openSettings: "Einstellungen öffnen",
+    openInNewTab: "In neuem Tab öffnen",
   },
   en: {
     search: "Search…",
@@ -178,6 +179,7 @@ const STRINGS = {
     stSectionSort: "Sorting & Views",
     stSectionNav: "Navigation & Layout",
     openSettings: "Open settings",
+    openInNewTab: "Open in new tab",
   },
 };
 
@@ -982,6 +984,22 @@ class NoteGalleryView extends ItemView {
             }).open();
           }
         },
+        {
+          label: s.openInNewTab,
+          icon: "arrow-up-right",
+          action: async () => {
+            const newLeaf = this.app.workspace.getLeaf("tab");
+            await newLeaf.openFile(file);
+            const leafHistory = (newLeaf as any).history;
+            if (leafHistory?.backHistory != null) {
+              leafHistory.backHistory = [{
+                state: { type: VIEW_TYPE, state: { folderPath: this.folder?.path ?? "" }, active: true },
+                eState: null,
+              }];
+              leafHistory.forwardHistory = [];
+            }
+          }
+        },
       ]);
     };
 
@@ -1004,19 +1022,8 @@ class NoteGalleryView extends ItemView {
     card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
 
     // Open note on tap/click
-    card.addEventListener("click", async () => {
-      const newLeaf = this.app.workspace.getLeaf("tab");
-      await newLeaf.openFile(file);
-      // Inject gallery state into the new leaf's back history so the back
-      // button is active and returns to this gallery folder.
-      const leafHistory = (newLeaf as any).history;
-      if (leafHistory?.backHistory != null) {
-        leafHistory.backHistory = [{
-          state: { type: VIEW_TYPE, state: { folderPath: this.folder?.path ?? "" }, active: true },
-          eState: null,
-        }];
-        leafHistory.forwardHistory = [];
-      }
+    card.addEventListener("click", () => {
+      this.leaf.openFile(file);
     });
   }
 
@@ -1084,6 +1091,22 @@ class NoteGalleryView extends ItemView {
             }).open();
           }
         },
+        {
+          label: s.openInNewTab,
+          icon: "arrow-up-right",
+          action: async () => {
+            const newLeaf = this.app.workspace.getLeaf("tab");
+            await newLeaf.openFile(file);
+            const leafHistory = (newLeaf as any).history;
+            if (leafHistory?.backHistory != null) {
+              leafHistory.backHistory = [{
+                state: { type: VIEW_TYPE, state: { folderPath: this.folder?.path ?? "" }, active: true },
+                eState: null,
+              }];
+              leafHistory.forwardHistory = [];
+            }
+          }
+        },
       ]);
     };
 
@@ -1102,17 +1125,8 @@ class NoteGalleryView extends ItemView {
     card.addEventListener("touchend", () => clearTimeout(longPressTimer));
     card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
 
-    card.addEventListener("click", async () => {
-      const newLeaf = this.app.workspace.getLeaf("tab");
-      await newLeaf.openFile(file);
-      const leafHistory = (newLeaf as any).history;
-      if (leafHistory?.backHistory != null) {
-        leafHistory.backHistory = [{
-          state: { type: VIEW_TYPE, state: { folderPath: this.folder?.path ?? "" }, active: true },
-          eState: null,
-        }];
-        leafHistory.forwardHistory = [];
-      }
+    card.addEventListener("click", () => {
+      this.leaf.openFile(file);
     });
   }
 
