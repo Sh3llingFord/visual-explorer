@@ -26,6 +26,7 @@ interface NoteGallerySettings {
   showPreview: boolean;
   breadcrumbFontSize: number;
   previewLines: 1 | 2;
+  sortFavoritesFirst: boolean;
 }
 
 const DEFAULT_SETTINGS: NoteGallerySettings = {
@@ -40,6 +41,7 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   showPreview: true,
   breadcrumbFontSize: 12,
   previewLines: 1,
+  sortFavoritesFirst: false,
 };
 
 const STRINGS = {
@@ -102,6 +104,8 @@ const STRINGS = {
     stBreadcrumbSizeDesc: "Schriftgröße des Breadcrumb-Pfads in Pixeln",
     stPreviewLines: "Vorschautext-Zeilen",
     stPreviewLinesDesc: "Wie viele Zeilen des Vorschautexts angezeigt werden (1 oder 2)",
+    stSortFavFirst: "Favoriten zuerst",
+    stSortFavFirstDesc: "Favoriten werden in der Ordneransicht oben angezeigt",
     stSectionGeneral: "Allgemein",
     stSectionCard: "Kartenanzeige",
     stSectionSort: "Sortierung & Ansichten",
@@ -167,6 +171,8 @@ const STRINGS = {
     stBreadcrumbSizeDesc: "Font size of the breadcrumb path in pixels",
     stPreviewLines: "Preview text lines",
     stPreviewLinesDesc: "How many lines of preview text to show (1 or 2)",
+    stSortFavFirst: "Favorites first",
+    stSortFavFirstDesc: "Show favorites at the top of the folder view",
     stSectionGeneral: "General",
     stSectionCard: "Card Display",
     stSectionSort: "Sorting & Views",
@@ -322,6 +328,67 @@ class CreateFolderModal extends Modal {
       if (e.key === "Enter") confirmBtn.click();
       if (e.key === "Escape") this.close();
     });
+  }
+
+  onClose() { this.contentEl.empty(); }
+}
+
+class RenameFolderModal extends Modal {
+  private folder: TFolder;
+  private onConfirm: (newName: string) => void;
+  private s: typeof STRINGS["de"];
+
+  constructor(app: App, folder: TFolder, s: typeof STRINGS["de"], onConfirm: (newName: string) => void) {
+    super(app);
+    this.folder = folder;
+    this.onConfirm = onConfirm;
+    this.s = s;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: this.s.renameFolder });
+    const input = contentEl.createEl("input", { type: "text", cls: "note-gallery-rename-input" });
+    input.value = this.folder.name;
+    input.select();
+    const btnRow = contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
+    btnRow.createEl("button", { text: this.s.cancel }).addEventListener("click", () => this.close());
+    const confirmBtn = btnRow.createEl("button", { text: this.s.renameConfirm, cls: "mod-cta" });
+    confirmBtn.addEventListener("click", () => {
+      const newName = input.value.trim();
+      if (newName && newName !== this.folder.name) this.onConfirm(newName);
+      this.close();
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") confirmBtn.click();
+      if (e.key === "Escape") this.close();
+    });
+    setTimeout(() => input.focus(), 50);
+  }
+
+  onClose() { this.contentEl.empty(); }
+}
+
+class ConfirmDeleteFolderModal extends Modal {
+  private folderName: string;
+  private onConfirm: () => void;
+  private s: typeof STRINGS["de"];
+
+  constructor(app: App, folderName: string, s: typeof STRINGS["de"], onConfirm: () => void) {
+    super(app);
+    this.folderName = folderName;
+    this.onConfirm = onConfirm;
+    this.s = s;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: this.s.deleteFolderTitle });
+    contentEl.createEl("p", { text: this.s.deleteFolderConfirm(this.folderName) });
+    const btnRow = contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
+    btnRow.createEl("button", { text: this.s.cancel }).addEventListener("click", () => this.close());
+    const deleteBtn = btnRow.createEl("button", { text: this.s.deleteFolder, cls: "mod-warning" });
+    deleteBtn.addEventListener("click", () => { this.onConfirm(); this.close(); });
   }
 
   onClose() { this.contentEl.empty(); }
@@ -726,26 +793,11 @@ class NoteGalleryView extends ItemView {
             label: s.renameFolder,
             icon: "pencil",
             action: () => {
-              const modal = new Modal(this.app);
-              modal.titleEl.setText(s.renameFolder);
-              const input = modal.contentEl.createEl("input", { type: "text", cls: "note-gallery-rename-input" });
-              input.value = subfolder.name;
-              input.select();
-              const btnRow = modal.contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
-              btnRow.createEl("button", { text: s.cancel }).addEventListener("click", () => modal.close());
-              const confirmBtn = btnRow.createEl("button", { text: s.renameConfirm, cls: "mod-cta" });
-              confirmBtn.addEventListener("click", async () => {
-                const newName = input.value.trim();
-                if (newName && newName !== subfolder.name) {
-                  const newPath = (subfolder.parent?.path ?? "") + "/" + newName;
-                  await this.app.fileManager.renameFile(subfolder, newPath);
-                  await this.render();
-                }
-                modal.close();
-              });
-              input.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmBtn.click(); if (e.key === "Escape") modal.close(); });
-              modal.open();
-              setTimeout(() => input.focus(), 50);
+              new RenameFolderModal(this.app, subfolder, s, async (newName) => {
+                const newPath = (subfolder.parent?.path ?? "") + "/" + newName;
+                await this.app.fileManager.renameFile(subfolder, newPath);
+                await this.render();
+              }).open();
             }
           },
           {
@@ -753,19 +805,11 @@ class NoteGalleryView extends ItemView {
             icon: "trash",
             danger: true,
             action: () => {
-              const modal = new Modal(this.app);
-              modal.titleEl.setText(s.deleteFolderTitle);
-              modal.contentEl.createEl("p", { text: s.deleteFolderConfirm(subfolder.name) });
-              const btnRow = modal.contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
-              btnRow.createEl("button", { text: s.cancel }).addEventListener("click", () => modal.close());
-              const deleteBtn = btnRow.createEl("button", { text: s.deleteFolder, cls: "mod-warning" });
-              deleteBtn.addEventListener("click", async () => {
+              new ConfirmDeleteFolderModal(this.app, subfolder.name, s, async () => {
                 await this.app.vault.trash(subfolder, true);
                 new Notice(s.deleted(subfolder.name));
                 await this.render();
-                modal.close();
-              });
-              modal.open();
+              }).open();
             }
           },
         ]);
@@ -803,6 +847,16 @@ class NoteGalleryView extends ItemView {
       if (sortBy === "created") return b.stat.ctime - a.stat.ctime;
       return b.stat.mtime - a.stat.mtime;
     });
+
+    if (this.plugin.settings.sortFavoritesFirst) {
+      files = files.sort((a, b) => {
+        const favA = isFavorite((this.app.metadataCache.getFileCache(a)?.frontmatter ?? {}) as Record<string, unknown>);
+        const favB = isFavorite((this.app.metadataCache.getFileCache(b)?.frontmatter ?? {}) as Record<string, unknown>);
+        if (favA && !favB) return -1;
+        if (!favA && favB) return 1;
+        return 0;
+      });
+    }
 
     // Counter
     const toolbar = this.containerEl.querySelector(".note-gallery-toolbar") as HTMLElement;
@@ -1144,6 +1198,14 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .addOption("2", "2")
           .setValue(String(this.plugin.settings.previewLines))
           .onChange(async (value) => { this.plugin.settings.previewLines = Number(value) as 1 | 2; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stSortFavFirst)
+      .setDesc(s.stSortFavFirstDesc)
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.sortFavoritesFirst)
+          .onChange(async (value) => { this.plugin.settings.sortFavoritesFirst = value; await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)
