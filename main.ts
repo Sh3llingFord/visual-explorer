@@ -834,6 +834,7 @@ class NoteGalleryView extends ItemView {
       card.addEventListener("touchstart", (e) => { longPressTimer = setTimeout(() => openFolderMenu(e), 500); }, { passive: true });
       card.addEventListener("touchend", () => clearTimeout(longPressTimer));
       card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
+      card.addEventListener("touchcancel", () => clearTimeout(longPressTimer));
       card.addEventListener("click", () => this.navigateTo(subfolder));
     }
 
@@ -1026,6 +1027,7 @@ class NoteGalleryView extends ItemView {
     }, { passive: true });
     card.addEventListener("touchend", () => clearTimeout(longPressTimer));
     card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
+    card.addEventListener("touchcancel", () => clearTimeout(longPressTimer));
 
     // Open note on tap/click
     card.addEventListener("click", () => {
@@ -1130,6 +1132,7 @@ class NoteGalleryView extends ItemView {
     }, { passive: true });
     card.addEventListener("touchend", () => clearTimeout(longPressTimer));
     card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
+    card.addEventListener("touchcancel", () => clearTimeout(longPressTimer));
 
     card.addEventListener("click", () => {
       this.leaf.openFile(file);

@@ -1,7 +1,7 @@
 {
   "id": "visual-explorer",
   "name": "Visual Explorer",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "minAppVersion": "1.4.0",
   "description": "Browse and manage notes as cards with image preview and favorites support.",
   "author": "Sh3llingFord",
