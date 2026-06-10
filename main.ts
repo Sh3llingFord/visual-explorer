@@ -119,6 +119,10 @@ const STRINGS = {
     stSectionNav: "Navigation & Layout",
     openSettings: "Einstellungen öffnen",
     openInNewTab: "In neuem Tab öffnen",
+    moveNote: "In Ordner verschieben",
+    moveNoteTitle: "Notiz verschieben",
+    moveNoteSearch: "Ordner suchen…",
+    moved: (name: string, folder: string) => `"${name}" verschoben nach ${folder}`,
   },
   en: {
     search: "Search…",
@@ -194,6 +198,10 @@ const STRINGS = {
     stSectionNav: "Navigation & Layout",
     openSettings: "Open settings",
     openInNewTab: "Open in new tab",
+    moveNote: "Move to folder",
+    moveNoteTitle: "Move note",
+    moveNoteSearch: "Search folders…",
+    moved: (name: string, folder: string) => `"${name}" moved to ${folder}`,
   },
 };
 
@@ -405,6 +413,75 @@ class ConfirmDeleteFolderModal extends Modal {
     btnRow.createEl("button", { text: this.s.cancel }).addEventListener("click", () => this.close());
     const deleteBtn = btnRow.createEl("button", { text: this.s.deleteFolder, cls: "mod-warning" });
     deleteBtn.addEventListener("click", () => { this.onConfirm(); this.close(); });
+  }
+
+  onClose() { this.contentEl.empty(); }
+}
+
+class MoveFolderModal extends Modal {
+  private file: TFile;
+  private onConfirm: (folder: TFolder) => void;
+  private s: typeof STRINGS["de"];
+
+  constructor(app: App, file: TFile, s: typeof STRINGS["de"], onConfirm: (folder: TFolder) => void) {
+    super(app);
+    this.file = file;
+    this.onConfirm = onConfirm;
+    this.s = s;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: this.s.moveNoteTitle });
+
+    const searchInput = contentEl.createEl("input", {
+      type: "text",
+      cls: "note-gallery-rename-input",
+      placeholder: this.s.moveNoteSearch,
+    });
+
+    const listEl = contentEl.createDiv({ cls: "note-gallery-move-list" });
+
+    const allFolders = this.getAllFolders();
+    const currentFolderPath = this.file.parent?.path ?? "";
+
+    const render = (query: string) => {
+      listEl.empty();
+      const q = query.toLowerCase();
+      const filtered = allFolders.filter(f =>
+        f.path !== currentFolderPath &&
+        (q === "" || f.path.toLowerCase().includes(q) || f.name.toLowerCase().includes(q))
+      );
+      if (filtered.length === 0) {
+        listEl.createDiv({ cls: "note-gallery-move-empty", text: "—" });
+        return;
+      }
+      for (const folder of filtered) {
+        const item = listEl.createDiv({ cls: "note-gallery-move-item" });
+        const displayPath = folder.path === "" ? "/ (Vault)" : folder.path;
+        item.setText(displayPath);
+        item.addEventListener("click", () => {
+          this.onConfirm(folder);
+          this.close();
+        });
+      }
+    };
+
+    render("");
+    searchInput.addEventListener("input", () => render(searchInput.value));
+    searchInput.focus();
+  }
+
+  private getAllFolders(): TFolder[] {
+    const folders: TFolder[] = [];
+    const collect = (f: TFolder) => {
+      folders.push(f);
+      for (const child of f.children) {
+        if (child instanceof TFolder) collect(child);
+      }
+    };
+    collect(this.app.vault.getRoot());
+    return folders.sort((a, b) => a.path.localeCompare(b.path));
   }
 
   onClose() { this.contentEl.empty(); }
@@ -1020,6 +1097,18 @@ class NoteGalleryView extends ItemView {
             new RenameModal(this.app, file, s, async (newName) => {
               const newPath = file.parent?.path + "/" + newName + ".md";
               await this.app.fileManager.renameFile(file, newPath);
+              await this.render();
+            }).open();
+          }
+        },
+        {
+          label: s.moveNote,
+          icon: "folder-input",
+          action: () => {
+            new MoveFolderModal(this.app, file, s, async (targetFolder) => {
+              const newPath = (targetFolder.path ? targetFolder.path + "/" : "") + file.name;
+              await this.app.fileManager.renameFile(file, newPath);
+              new Notice(s.moved(file.basename, targetFolder.path || "/"));
               await this.render();
             }).open();
           }
