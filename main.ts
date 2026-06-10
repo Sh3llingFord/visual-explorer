@@ -512,10 +512,6 @@ class NoteGalleryView extends ItemView {
   async navigateTo(folder: TFolder) {
     await this.leaf.setViewState({
       type: VIEW_TYPE,
-      state: { folderPath: this.folder?.path ?? "" },
-    });
-    await this.leaf.setViewState({
-      type: VIEW_TYPE,
       active: true,
       state: { folderPath: folder.path },
     });
@@ -786,14 +782,6 @@ class NoteGalleryView extends ItemView {
             icon: "arrow-up-right",
             action: async () => {
               const newLeaf = this.app.workspace.getLeaf("tab");
-              // Activate with parent first so Obsidian records a real navigation entry
-              await newLeaf.setViewState({
-                type: VIEW_TYPE,
-                active: true,
-                state: { folderPath: this.folder?.path ?? "" },
-              });
-              // Navigate to subfolder — Obsidian pushes parent to backHistory natively
-              // and updates the back button visual state
               await newLeaf.setViewState({
                 type: VIEW_TYPE,
                 active: true,
