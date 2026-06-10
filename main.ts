@@ -1005,7 +1005,7 @@ class NoteGalleryView extends ItemView {
 
     // Open note on tap/click
     card.addEventListener("click", () => {
-      this.leaf.openFile(file);
+      this.app.workspace.openLinkText(file.path, this.folder?.path ?? "", "tab");
     });
   }
 
@@ -1092,7 +1092,7 @@ class NoteGalleryView extends ItemView {
     card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
 
     card.addEventListener("click", () => {
-      this.leaf.openFile(file);
+      this.app.workspace.openLinkText(file.path, this.folder?.path ?? "", "tab");
     });
   }
 
