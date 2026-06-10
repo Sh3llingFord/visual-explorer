@@ -25,6 +25,8 @@ interface NoteGallerySettings {
   recentCount: number;
   showPreview: boolean;
   breadcrumbFontSize: number;
+  previewLines: 1 | 2;
+  sortFavoritesFirst: boolean;
 }
 
 const DEFAULT_SETTINGS: NoteGallerySettings = {
@@ -38,6 +40,8 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   recentCount: 30,
   showPreview: true,
   breadcrumbFontSize: 12,
+  previewLines: 1,
+  sortFavoritesFirst: false,
 };
 
 const STRINGS = {
@@ -61,6 +65,7 @@ const STRINGS = {
     createFolderPlaceholder: "Ordnername",
     createFolderConfirm: "Erstellen",
     notes: "Notizen",
+    files: "Dateien",
     subfolders: "Unterordner",
     deleted: (name: string) => `"${name}" gelöscht`,
     newNote: (date: string) => `Neue Notiz ${date}`,
@@ -97,6 +102,15 @@ const STRINGS = {
     stShowPreviewDesc: "Ersten Zeilen der Notiz unterhalb des Datums anzeigen",
     stBreadcrumbSize: "Breadcrumb-Schriftgröße",
     stBreadcrumbSizeDesc: "Schriftgröße des Breadcrumb-Pfads in Pixeln",
+    stPreviewLines: "Vorschautext-Zeilen",
+    stPreviewLinesDesc: "Wie viele Zeilen des Vorschautexts angezeigt werden (1 oder 2)",
+    stSortFavFirst: "Favoriten zuerst",
+    stSortFavFirstDesc: "Favoriten werden in der Ordneransicht oben angezeigt",
+    stSectionGeneral: "Allgemein",
+    stSectionCard: "Kartenanzeige",
+    stSectionSort: "Sortierung & Ansichten",
+    stSectionNav: "Navigation & Layout",
+    openSettings: "Einstellungen öffnen",
   },
   en: {
     search: "Search…",
@@ -118,6 +132,7 @@ const STRINGS = {
     createFolderPlaceholder: "Folder name",
     createFolderConfirm: "Create",
     notes: "Notes",
+    files: "Files",
     subfolders: "Subfolders",
     deleted: (name: string) => `"${name}" deleted`,
     newNote: (date: string) => `New note ${date}`,
@@ -154,10 +169,21 @@ const STRINGS = {
     stShowPreviewDesc: "Show the first lines of the note below the date",
     stBreadcrumbSize: "Breadcrumb font size",
     stBreadcrumbSizeDesc: "Font size of the breadcrumb path in pixels",
+    stPreviewLines: "Preview text lines",
+    stPreviewLinesDesc: "How many lines of preview text to show (1 or 2)",
+    stSortFavFirst: "Favorites first",
+    stSortFavFirstDesc: "Show favorites at the top of the folder view",
+    stSectionGeneral: "General",
+    stSectionCard: "Card Display",
+    stSectionSort: "Sorting & Views",
+    stSectionNav: "Navigation & Layout",
+    openSettings: "Open settings",
   },
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
 
 function extractFirstImage(content: string): string | null {
   const wikiMatch = content.match(/!\[\[([^\]]+\.(png|jpg|jpeg|gif|webp))[^\]]*\]\]/i);
@@ -185,9 +211,9 @@ function extractPreviewText(content: string): string {
 
 function extractCategories(frontmatter: Record<string, unknown>): string {
   const cats = frontmatter?.categories;
-  if (Array.isArray(cats) && cats.length > 0) return "#" + cats[0];
+  if (Array.isArray(cats) && cats.length > 0) return cats.map((c: unknown) => "#" + c).join(" · ");
   const tags = frontmatter?.tags;
-  if (Array.isArray(tags) && tags.length > 0) return "#" + tags[0];
+  if (Array.isArray(tags) && tags.length > 0) return tags.map((t: unknown) => "#" + t).join(" · ");
   return "";
 }
 
@@ -307,22 +333,87 @@ class CreateFolderModal extends Modal {
   onClose() { this.contentEl.empty(); }
 }
 
+class RenameFolderModal extends Modal {
+  private folder: TFolder;
+  private onConfirm: (newName: string) => void;
+  private s: typeof STRINGS["de"];
+
+  constructor(app: App, folder: TFolder, s: typeof STRINGS["de"], onConfirm: (newName: string) => void) {
+    super(app);
+    this.folder = folder;
+    this.onConfirm = onConfirm;
+    this.s = s;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: this.s.renameFolder });
+    const input = contentEl.createEl("input", { type: "text", cls: "note-gallery-rename-input" });
+    input.value = this.folder.name;
+    input.select();
+    const btnRow = contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
+    btnRow.createEl("button", { text: this.s.cancel }).addEventListener("click", () => this.close());
+    const confirmBtn = btnRow.createEl("button", { text: this.s.renameConfirm, cls: "mod-cta" });
+    confirmBtn.addEventListener("click", () => {
+      const newName = input.value.trim();
+      if (newName && newName !== this.folder.name) this.onConfirm(newName);
+      this.close();
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") confirmBtn.click();
+      if (e.key === "Escape") this.close();
+    });
+    setTimeout(() => input.focus(), 50);
+  }
+
+  onClose() { this.contentEl.empty(); }
+}
+
+class ConfirmDeleteFolderModal extends Modal {
+  private folderName: string;
+  private onConfirm: () => void;
+  private s: typeof STRINGS["de"];
+
+  constructor(app: App, folderName: string, s: typeof STRINGS["de"], onConfirm: () => void) {
+    super(app);
+    this.folderName = folderName;
+    this.onConfirm = onConfirm;
+    this.s = s;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: this.s.deleteFolderTitle });
+    contentEl.createEl("p", { text: this.s.deleteFolderConfirm(this.folderName) });
+    const btnRow = contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
+    btnRow.createEl("button", { text: this.s.cancel }).addEventListener("click", () => this.close());
+    const deleteBtn = btnRow.createEl("button", { text: this.s.deleteFolder, cls: "mod-warning" });
+    deleteBtn.addEventListener("click", () => { this.onConfirm(); this.close(); });
+  }
+
+  onClose() { this.contentEl.empty(); }
+}
+
 // ── Context Menu ─────────────────────────────────────────────────────────────
 
 function showContextMenu(
   app: App,
   e: MouseEvent | TouchEvent,
-  items: { label: string; icon?: string; danger?: boolean; action: () => void }[]
+  items: ({ label: string; icon?: string; danger?: boolean; action: () => void } | { separator: true })[]
 ) {
   const menu = new Menu();
 
   for (const item of items) {
-    menu.addItem((menuItem) => {
-      menuItem.setTitle(item.label);
-      if (item.icon) menuItem.setIcon(item.icon);
-      if (item.danger) menuItem.setWarning(true);
-      menuItem.onClick(() => item.action());
-    });
+    if ("separator" in item) {
+      menu.addSeparator();
+    } else {
+      menu.addItem((menuItem) => {
+        menuItem.setTitle(item.label);
+        if (item.icon) menuItem.setIcon(item.icon);
+        if (item.danger) menuItem.setWarning(true);
+        menuItem.onClick(() => item.action());
+      });
+    }
   }
 
   if (e instanceof MouseEvent) {
@@ -365,14 +456,16 @@ class NoteGalleryView extends ItemView {
       const found = this.app.vault.getAbstractFileByPath(path);
       if (found instanceof TFolder) {
         this.folder = found;
-        this.breadcrumb = this.buildBreadcrumb(found);
+        this.breadcrumb = this.computeBreadcrumb(found);
       }
     }
+    this.mode = "folder";
+    this.searchQuery = "";
     this.load();
     await this.render();
   }
 
-  buildBreadcrumb(folder: TFolder): TFolder[] {
+  computeBreadcrumb(folder: TFolder): TFolder[] {
     const crumbs: TFolder[] = [];
     let current: TFolder | null = folder;
     while (current) {
@@ -426,12 +519,10 @@ class NoteGalleryView extends ItemView {
   }
 
   async navigateTo(folder: TFolder) {
-    this.mode = "folder";
-    this.folder = folder;
-    this.folderPath = folder.path;
-    this.breadcrumb = this.buildBreadcrumb(folder);
-    this.searchQuery = "";
-    await this.render();
+    await this.leaf.setViewState({
+      type: VIEW_TYPE,
+      state: { folderPath: folder.path },
+    });
   }
 
   async onOpen() {
@@ -478,6 +569,9 @@ class NoteGalleryView extends ItemView {
     const toolbar = container.createDiv({ cls: "note-gallery-toolbar" });
     this.buildBreadcrumb(toolbar, s, breadcrumbFontSize);
     this.buildControlsRow(toolbar, container, s, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+
+    const allTags = this.collectTagsForCurrentView();
+    if (allTags.length > 0) this.buildTagChips(toolbar, allTags);
 
     const listContainer = container.createDiv({ cls: "note-gallery-list" });
     await this.renderList(listContainer, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
@@ -538,6 +632,15 @@ class NoteGalleryView extends ItemView {
       if (lc) await this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
     });
 
+    searchInput.addEventListener("keydown", async (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        this.searchQuery = "";
+        searchInput.value = "";
+        clearBtn.style.display = "none";
+        await this.render();
+      }
+    });
+
     clearBtn.addEventListener("click", async () => {
       this.searchQuery = "";
       searchInput.value = "";
@@ -562,6 +665,7 @@ class NoteGalleryView extends ItemView {
           icon: "clock",
           action: () => { this.mode = "recent"; this.searchQuery = ""; this.render(); }
         },
+        { separator: true },
         {
           label: s.newDoc,
           icon: "file-plus",
@@ -576,6 +680,15 @@ class NoteGalleryView extends ItemView {
               await this.app.vault.createFolder(path);
               await this.render();
             }).open();
+          }
+        },
+        { separator: true },
+        {
+          label: s.openSettings,
+          icon: "settings",
+          action: () => {
+            (this.app as any).setting.open();
+            (this.app as any).setting.openTabById("visual-explorer");
           }
         },
       ]);
@@ -660,9 +773,9 @@ class NoteGalleryView extends ItemView {
       chevron.setText("›");
       const textDiv = card.createDiv({ cls: "note-gallery-text" });
       textDiv.createDiv({ cls: "note-gallery-title note-gallery-folder-title", text: subfolder.name });
-      const fileCount = subfolder.children.filter(f => f instanceof TFile && (f as TFile).extension === "md").length;
+      const fileCount = subfolder.children.filter(f => f instanceof TFile).length;
       const folderCount = subfolder.children.filter(f => f instanceof TFolder).length;
-      const meta = [fileCount + " " + s.notes, folderCount > 0 ? folderCount + " " + s.subfolders : ""].filter(Boolean).join(" · ");
+      const meta = [fileCount + " " + s.files, folderCount > 0 ? folderCount + " " + s.subfolders : ""].filter(Boolean).join(" · ");
       textDiv.createDiv({ cls: "note-gallery-date", text: meta });
 
       const openFolderMenu = (e: MouseEvent | TouchEvent) => {
@@ -680,26 +793,11 @@ class NoteGalleryView extends ItemView {
             label: s.renameFolder,
             icon: "pencil",
             action: () => {
-              const modal = new Modal(this.app);
-              modal.titleEl.setText(s.renameFolder);
-              const input = modal.contentEl.createEl("input", { type: "text", cls: "note-gallery-rename-input" });
-              input.value = subfolder.name;
-              input.select();
-              const btnRow = modal.contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
-              btnRow.createEl("button", { text: s.cancel }).addEventListener("click", () => modal.close());
-              const confirmBtn = btnRow.createEl("button", { text: s.renameConfirm, cls: "mod-cta" });
-              confirmBtn.addEventListener("click", async () => {
-                const newName = input.value.trim();
-                if (newName && newName !== subfolder.name) {
-                  const newPath = (subfolder.parent?.path ?? "") + "/" + newName;
-                  await this.app.fileManager.renameFile(subfolder, newPath);
-                  await this.render();
-                }
-                modal.close();
-              });
-              input.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmBtn.click(); if (e.key === "Escape") modal.close(); });
-              modal.open();
-              setTimeout(() => input.focus(), 50);
+              new RenameFolderModal(this.app, subfolder, s, async (newName) => {
+                const newPath = (subfolder.parent?.path ?? "") + "/" + newName;
+                await this.app.fileManager.renameFile(subfolder, newPath);
+                await this.render();
+              }).open();
             }
           },
           {
@@ -707,24 +805,22 @@ class NoteGalleryView extends ItemView {
             icon: "trash",
             danger: true,
             action: () => {
-              const modal = new Modal(this.app);
-              modal.titleEl.setText(s.deleteFolderTitle);
-              modal.contentEl.createEl("p", { text: s.deleteFolderConfirm(subfolder.name) });
-              const btnRow = modal.contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
-              btnRow.createEl("button", { text: s.cancel }).addEventListener("click", () => modal.close());
-              const deleteBtn = btnRow.createEl("button", { text: s.deleteFolder, cls: "mod-warning" });
-              deleteBtn.addEventListener("click", async () => {
+              new ConfirmDeleteFolderModal(this.app, subfolder.name, s, async () => {
                 await this.app.vault.trash(subfolder, true);
                 new Notice(s.deleted(subfolder.name));
                 await this.render();
-                modal.close();
-              });
-              modal.open();
+              }).open();
             }
           },
         ]);
       };
 
+      card.setAttribute("tabindex", "0");
+      card.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Enter") { card.click(); }
+        if (e.key === "ArrowDown") { e.preventDefault(); const next = card.nextElementSibling as HTMLElement; if (next?.classList.contains("note-gallery-card")) next.focus(); }
+        if (e.key === "ArrowUp") { e.preventDefault(); const prev = card.previousElementSibling as HTMLElement; if (prev?.classList.contains("note-gallery-card")) prev.focus(); }
+      });
       card.addEventListener("contextmenu", (e) => openFolderMenu(e));
       let longPressTimer: ReturnType<typeof setTimeout>;
       card.addEventListener("touchstart", (e) => { longPressTimer = setTimeout(() => openFolderMenu(e), 500); }, { passive: true });
@@ -734,10 +830,10 @@ class NoteGalleryView extends ItemView {
     }
 
     let files = this.folder.children
-      .filter((f): f is TFile => f instanceof TFile && f.extension === "md")
+      .filter((f): f is TFile => f instanceof TFile)
       .filter(f => {
         if (!q) return true;
-        if (f.basename.toLowerCase().includes(q)) return true;
+        if (f.name.toLowerCase().includes(q)) return true;
         const meta = this.app.metadataCache.getFileCache(f);
         const tags = [
           ...(Array.isArray(meta?.frontmatter?.tags) ? meta.frontmatter.tags : []),
@@ -752,17 +848,31 @@ class NoteGalleryView extends ItemView {
       return b.stat.mtime - a.stat.mtime;
     });
 
+    if (this.plugin.settings.sortFavoritesFirst) {
+      files = files.sort((a, b) => {
+        const favA = isFavorite((this.app.metadataCache.getFileCache(a)?.frontmatter ?? {}) as Record<string, unknown>);
+        const favB = isFavorite((this.app.metadataCache.getFileCache(b)?.frontmatter ?? {}) as Record<string, unknown>);
+        if (favA && !favB) return -1;
+        if (!favA && favB) return 1;
+        return 0;
+      });
+    }
+
     // Counter
     const toolbar = this.containerEl.querySelector(".note-gallery-toolbar") as HTMLElement;
     const existingCounter = toolbar?.querySelector(".note-gallery-counter");
     if (existingCounter) existingCounter.remove();
     if (toolbar) {
       const counter = toolbar.createDiv({ cls: "note-gallery-counter" });
-      counter.setText(files.length + " " + s.notes + (subfolders.length > 0 ? ` · ${subfolders.length} ` + s.subfolders : ""));
+      counter.setText(files.length + " " + s.files + (subfolders.length > 0 ? ` · ${subfolders.length} ` + s.subfolders : ""));
     }
 
     for (const file of files) {
-      await this.renderNoteCard(listContainer, file, filesFolder, dateLocale, titleWrap, thumbnailSize);
+      if (file.extension === "md") {
+        await this.renderNoteCard(listContainer, file, filesFolder, dateLocale, titleWrap, thumbnailSize);
+      } else {
+        await this.renderFileCard(listContainer, file, dateLocale, titleWrap, thumbnailSize);
+      }
     }
 
     listContainer.createDiv({ cls: "note-gallery-list-spacer" });
@@ -776,7 +886,7 @@ class NoteGalleryView extends ItemView {
     titleWrap: boolean,
     thumbnailSize: number
   ) {
-    const { language, showPreview } = this.plugin.settings;
+    const { language, showPreview, previewLines } = this.plugin.settings;
     const s = STRINGS[language];
     const content = await this.app.vault.read(file);
     const cache = this.app.metadataCache.getFileCache(file);
@@ -800,7 +910,10 @@ class NoteGalleryView extends ItemView {
 
     if (category) textDiv.createDiv({ cls: "note-gallery-category", text: category });
     textDiv.createDiv({ cls: "note-gallery-date", text: dateStr });
-    if (showPreview && previewText) textDiv.createDiv({ cls: "note-gallery-preview", text: previewText });
+    if (showPreview && previewText) {
+      const previewEl = textDiv.createDiv({ text: previewText });
+      previewEl.addClass(previewLines === 2 ? "note-gallery-preview--two-lines" : "note-gallery-preview");
+    }
 
     // Right: image
     if (imgPath) {
@@ -872,6 +985,13 @@ class NoteGalleryView extends ItemView {
       ]);
     };
 
+    card.setAttribute("tabindex", "0");
+    card.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Enter") { card.click(); }
+      if (e.key === "ArrowDown") { e.preventDefault(); const next = card.nextElementSibling as HTMLElement; if (next?.classList.contains("note-gallery-card")) next.focus(); }
+      if (e.key === "ArrowUp") { e.preventDefault(); const prev = card.previousElementSibling as HTMLElement; if (prev?.classList.contains("note-gallery-card")) prev.focus(); }
+    });
+
     // Desktop: right-click
     card.addEventListener("contextmenu", (e) => openCardMenu(e));
 
@@ -887,6 +1007,135 @@ class NoteGalleryView extends ItemView {
     card.addEventListener("click", () => {
       this.app.workspace.getLeaf(false).openFile(file);
     });
+  }
+
+  async renderFileCard(
+    listContainer: HTMLElement,
+    file: TFile,
+    dateLocale: string,
+    titleWrap: boolean,
+    thumbnailSize: number
+  ) {
+    const { language } = this.plugin.settings;
+    const s = STRINGS[language];
+
+    const isImage = IMAGE_EXTS.has(file.extension.toLowerCase());
+    const dateStr = new Date(file.stat.mtime).toLocaleDateString(dateLocale, {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+
+    const card = listContainer.createDiv({ cls: "note-gallery-card" });
+
+    const textDiv = card.createDiv({ cls: "note-gallery-text" });
+    const titleRow = textDiv.createDiv({ cls: "note-gallery-title-row" });
+    const titleEl = titleRow.createSpan({ cls: "note-gallery-title" });
+    titleEl.setText(file.name);
+    if (titleWrap) titleEl.addClass("note-gallery-title--wrap");
+
+    textDiv.createDiv({ cls: "note-gallery-category", text: file.extension.toUpperCase() });
+    textDiv.createDiv({ cls: "note-gallery-date", text: dateStr });
+
+    if (isImage) {
+      const imgDiv = card.createDiv({ cls: "note-gallery-thumb" });
+      imgDiv.style.width = thumbnailSize + "px";
+      imgDiv.style.height = thumbnailSize + "px";
+      const url = this.app.vault.getResourcePath(file);
+      const img = imgDiv.createEl("img");
+      img.src = url;
+      img.alt = file.name;
+    }
+
+    const openCardMenu = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenu(this.app, e, [
+        {
+          label: s.rename,
+          icon: "pencil",
+          action: () => {
+            new RenameModal(this.app, file, s, async (newName) => {
+              const newPath = file.parent?.path + "/" + newName + "." + file.extension;
+              await this.app.fileManager.renameFile(file, newPath);
+              await this.render();
+            }).open();
+          }
+        },
+        {
+          label: s.delete,
+          icon: "trash",
+          danger: true,
+          action: () => {
+            new ConfirmDeleteModal(this.app, file.name, s, async () => {
+              await this.app.vault.trash(file, true);
+              new Notice(s.deleted(file.name));
+              await this.render();
+            }).open();
+          }
+        },
+      ]);
+    };
+
+    card.setAttribute("tabindex", "0");
+    card.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Enter") { card.click(); }
+      if (e.key === "ArrowDown") { e.preventDefault(); const next = card.nextElementSibling as HTMLElement; if (next?.classList.contains("note-gallery-card")) next.focus(); }
+      if (e.key === "ArrowUp") { e.preventDefault(); const prev = card.previousElementSibling as HTMLElement; if (prev?.classList.contains("note-gallery-card")) prev.focus(); }
+    });
+
+    card.addEventListener("contextmenu", (e) => openCardMenu(e));
+    let longPressTimer: ReturnType<typeof setTimeout>;
+    card.addEventListener("touchstart", (e) => {
+      longPressTimer = setTimeout(() => openCardMenu(e), 500);
+    }, { passive: true });
+    card.addEventListener("touchend", () => clearTimeout(longPressTimer));
+    card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
+
+    card.addEventListener("click", () => {
+      this.app.workspace.getLeaf(false).openFile(file);
+    });
+  }
+
+  private collectTagsForCurrentView(): string[] {
+    const allTags = new Set<string>();
+    let files: TFile[];
+
+    if (this.mode === "folder") {
+      files = this.folder.children
+        .filter((f): f is TFile => f instanceof TFile && f.extension === "md");
+    } else if (this.mode === "recent") {
+      files = this.app.vault.getMarkdownFiles()
+        .sort((a, b) => b.stat.mtime - a.stat.mtime)
+        .slice(0, this.plugin.settings.recentCount);
+    } else {
+      files = this.app.vault.getMarkdownFiles().filter(f => {
+        const cache = this.app.metadataCache.getFileCache(f);
+        return isFavorite((cache?.frontmatter ?? {}) as Record<string, unknown>);
+      });
+    }
+
+    for (const file of files) {
+      const cache = this.app.metadataCache.getFileCache(file);
+      const cats = cache?.frontmatter?.categories;
+      const tags = cache?.frontmatter?.tags;
+      if (Array.isArray(cats)) cats.forEach((c: unknown) => allTags.add(String(c)));
+      if (Array.isArray(tags)) tags.forEach((t: unknown) => allTags.add(String(t)));
+    }
+
+    return [...allTags].sort();
+  }
+
+  private buildTagChips(toolbar: HTMLElement, tags: string[]) {
+    const chipsRow = toolbar.createDiv({ cls: "note-gallery-tag-chips" });
+    for (const tag of tags) {
+      const chip = chipsRow.createSpan({ cls: "note-gallery-tag-chip" });
+      chip.setText("#" + tag);
+      if (this.searchQuery === tag) chip.addClass("note-gallery-tag-chip--active");
+      chip.addEventListener("click", () => {
+        this.searchQuery = this.searchQuery === tag ? "" : tag;
+        this.render();
+      });
+    }
   }
 }
 
@@ -904,7 +1153,68 @@ class NoteGallerySettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     const s = STRINGS[this.plugin.settings.language];
-    containerEl.createEl("h2", { text: "Note Gallery" });
+    containerEl.createEl("h2", { text: "Visual Explorer" });
+
+    // ── Allgemein / General ────────────────────────────────────────
+    containerEl.createEl("h3", { text: s.stSectionGeneral, cls: "note-gallery-settings-section" });
+
+    new Setting(containerEl)
+      .setName("Sprache / Language")
+      .setDesc("Sprache der Benutzeroberfläche / UI language")
+      .addDropdown(drop =>
+        drop.addOption("de", "Deutsch")
+          .addOption("en", "English")
+          .setValue(this.plugin.settings.language)
+          .onChange(async (value) => { this.plugin.settings.language = value as "de" | "en"; await this.plugin.saveSettings(); this.display(); })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stDateLocale)
+      .setDesc(s.stDateLocaleDesc)
+      .addDropdown(drop =>
+        drop.addOption("de-DE", "Deutsch (13. Okt. 2024)")
+          .addOption("en-US", "English (Oct 13, 2024)")
+          .addOption("en-GB", "English UK (13 Oct 2024)")
+          .setValue(this.plugin.settings.dateLocale)
+          .onChange(async (value) => { this.plugin.settings.dateLocale = value; await this.plugin.saveSettings(); })
+      );
+
+    // ── Kartenanzeige / Card Display ──────────────────────────────
+    containerEl.createEl("h3", { text: s.stSectionCard, cls: "note-gallery-settings-section" });
+
+    new Setting(containerEl)
+      .setName(s.stShowPreview)
+      .setDesc(s.stShowPreviewDesc)
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.showPreview)
+          .onChange(async (value) => { this.plugin.settings.showPreview = value; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stPreviewLines)
+      .setDesc(s.stPreviewLinesDesc)
+      .addDropdown(drop =>
+        drop.addOption("1", "1")
+          .addOption("2", "2")
+          .setValue(String(this.plugin.settings.previewLines))
+          .onChange(async (value) => { this.plugin.settings.previewLines = Number(value) as 1 | 2; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stSortFavFirst)
+      .setDesc(s.stSortFavFirstDesc)
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.sortFavoritesFirst)
+          .onChange(async (value) => { this.plugin.settings.sortFavoritesFirst = value; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stTitleWrap)
+      .setDesc(s.stTitleWrapDesc)
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.titleWrap)
+          .onChange(async (value) => { this.plugin.settings.titleWrap = value; await this.plugin.saveSettings(); })
+      );
 
     new Setting(containerEl)
       .setName(s.stThumbSize)
@@ -922,6 +1232,9 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .onChange(async (value) => { this.plugin.settings.filesFolder = value.trim(); await this.plugin.saveSettings(); })
       );
 
+    // ── Sortierung & Ansichten / Sorting & Views ──────────────────
+    containerEl.createEl("h3", { text: s.stSectionSort, cls: "note-gallery-settings-section" });
+
     new Setting(containerEl)
       .setName(s.stSortBy)
       .setDesc(s.stSortByDesc)
@@ -934,15 +1247,15 @@ class NoteGallerySettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName(s.stDateLocale)
-      .setDesc(s.stDateLocaleDesc)
-      .addDropdown(drop =>
-        drop.addOption("de-DE", "Deutsch (13. Okt. 2024)")
-          .addOption("en-US", "English (Oct 13, 2024)")
-          .addOption("en-GB", "English UK (13 Oct 2024)")
-          .setValue(this.plugin.settings.dateLocale)
-          .onChange(async (value) => { this.plugin.settings.dateLocale = value; await this.plugin.saveSettings(); })
+      .setName(s.stRecentCount)
+      .setDesc(s.stRecentCountDesc)
+      .addSlider(slider =>
+        slider.setLimits(5, 100, 5).setValue(this.plugin.settings.recentCount).setDynamicTooltip()
+          .onChange(async (value) => { this.plugin.settings.recentCount = value; await this.plugin.saveSettings(); })
       );
+
+    // ── Navigation & Layout ───────────────────────────────────────
+    containerEl.createEl("h3", { text: s.stSectionNav, cls: "note-gallery-settings-section" });
 
     new Setting(containerEl)
       .setName(s.stBackBtnPos)
@@ -952,40 +1265,6 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .addOption("bottom-right", s.stBackRight)
           .setValue(this.plugin.settings.backButtonPosition)
           .onChange(async (value) => { this.plugin.settings.backButtonPosition = value as "bottom-left" | "bottom-right"; await this.plugin.saveSettings(); })
-      );
-
-    new Setting(containerEl)
-      .setName(s.stTitleWrap)
-      .setDesc(s.stTitleWrapDesc)
-      .addToggle(toggle =>
-        toggle.setValue(this.plugin.settings.titleWrap)
-          .onChange(async (value) => { this.plugin.settings.titleWrap = value; await this.plugin.saveSettings(); })
-      );
-
-    new Setting(containerEl)
-      .setName("Sprache / Language")
-      .setDesc("Sprache der Benutzeroberfläche / UI language")
-      .addDropdown(drop =>
-        drop.addOption("de", "Deutsch")
-          .addOption("en", "English")
-          .setValue(this.plugin.settings.language)
-          .onChange(async (value) => { this.plugin.settings.language = value as "de" | "en"; await this.plugin.saveSettings(); this.display(); })
-      );
-
-    new Setting(containerEl)
-      .setName(s.stRecentCount)
-      .setDesc(s.stRecentCountDesc)
-      .addSlider(slider =>
-        slider.setLimits(5, 100, 5).setValue(this.plugin.settings.recentCount).setDynamicTooltip()
-          .onChange(async (value) => { this.plugin.settings.recentCount = value; await this.plugin.saveSettings(); })
-      );
-
-    new Setting(containerEl)
-      .setName(s.stShowPreview)
-      .setDesc(s.stShowPreviewDesc)
-      .addToggle(toggle =>
-        toggle.setValue(this.plugin.settings.showPreview)
-          .onChange(async (value) => { this.plugin.settings.showPreview = value; await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)
