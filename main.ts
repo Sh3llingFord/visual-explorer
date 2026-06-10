@@ -798,6 +798,7 @@ class NoteGalleryView extends ItemView {
                   eState: null,
                 }];
                 leafHistory.forwardHistory = [];
+                this.app.workspace.trigger("layout-change");
               }
             }
           },
