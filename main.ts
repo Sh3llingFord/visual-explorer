@@ -98,6 +98,11 @@ const STRINGS = {
     stShowPreviewDesc: "Ersten Zeilen der Notiz unterhalb des Datums anzeigen",
     stBreadcrumbSize: "Breadcrumb-Schriftgröße",
     stBreadcrumbSizeDesc: "Schriftgröße des Breadcrumb-Pfads in Pixeln",
+    stSectionGeneral: "Allgemein",
+    stSectionCard: "Kartenanzeige",
+    stSectionSort: "Sortierung & Ansichten",
+    stSectionNav: "Navigation & Layout",
+    openSettings: "Einstellungen öffnen",
   },
   en: {
     search: "Search…",
@@ -156,6 +161,11 @@ const STRINGS = {
     stShowPreviewDesc: "Show the first lines of the note below the date",
     stBreadcrumbSize: "Breadcrumb font size",
     stBreadcrumbSizeDesc: "Font size of the breadcrumb path in pixels",
+    stSectionGeneral: "General",
+    stSectionCard: "Card Display",
+    stSectionSort: "Sorting & Views",
+    stSectionNav: "Navigation & Layout",
+    openSettings: "Open settings",
   },
 };
 
@@ -316,17 +326,21 @@ class CreateFolderModal extends Modal {
 function showContextMenu(
   app: App,
   e: MouseEvent | TouchEvent,
-  items: { label: string; icon?: string; danger?: boolean; action: () => void }[]
+  items: ({ label: string; icon?: string; danger?: boolean; action: () => void } | { separator: true })[]
 ) {
   const menu = new Menu();
 
   for (const item of items) {
-    menu.addItem((menuItem) => {
-      menuItem.setTitle(item.label);
-      if (item.icon) menuItem.setIcon(item.icon);
-      if (item.danger) menuItem.setWarning(true);
-      menuItem.onClick(() => item.action());
-    });
+    if ("separator" in item) {
+      menu.addSeparator();
+    } else {
+      menu.addItem((menuItem) => {
+        menuItem.setTitle(item.label);
+        if (item.icon) menuItem.setIcon(item.icon);
+        if (item.danger) menuItem.setWarning(true);
+        menuItem.onClick(() => item.action());
+      });
+    }
   }
 
   if (e instanceof MouseEvent) {
@@ -566,6 +580,7 @@ class NoteGalleryView extends ItemView {
           icon: "clock",
           action: () => { this.mode = "recent"; this.searchQuery = ""; this.render(); }
         },
+        { separator: true },
         {
           label: s.newDoc,
           icon: "file-plus",
@@ -580,6 +595,15 @@ class NoteGalleryView extends ItemView {
               await this.app.vault.createFolder(path);
               await this.render();
             }).open();
+          }
+        },
+        { separator: true },
+        {
+          label: s.openSettings,
+          icon: "settings",
+          action: () => {
+            (this.app as any).setting.open();
+            (this.app as any).setting.openTabById("visual-explorer");
           }
         },
       ]);
@@ -992,7 +1016,50 @@ class NoteGallerySettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     const s = STRINGS[this.plugin.settings.language];
-    containerEl.createEl("h2", { text: "Note Gallery" });
+    containerEl.createEl("h2", { text: "Visual Explorer" });
+
+    // ── Allgemein / General ────────────────────────────────────────
+    containerEl.createEl("h3", { text: s.stSectionGeneral, cls: "note-gallery-settings-section" });
+
+    new Setting(containerEl)
+      .setName("Sprache / Language")
+      .setDesc("Sprache der Benutzeroberfläche / UI language")
+      .addDropdown(drop =>
+        drop.addOption("de", "Deutsch")
+          .addOption("en", "English")
+          .setValue(this.plugin.settings.language)
+          .onChange(async (value) => { this.plugin.settings.language = value as "de" | "en"; await this.plugin.saveSettings(); this.display(); })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stDateLocale)
+      .setDesc(s.stDateLocaleDesc)
+      .addDropdown(drop =>
+        drop.addOption("de-DE", "Deutsch (13. Okt. 2024)")
+          .addOption("en-US", "English (Oct 13, 2024)")
+          .addOption("en-GB", "English UK (13 Oct 2024)")
+          .setValue(this.plugin.settings.dateLocale)
+          .onChange(async (value) => { this.plugin.settings.dateLocale = value; await this.plugin.saveSettings(); })
+      );
+
+    // ── Kartenanzeige / Card Display ──────────────────────────────
+    containerEl.createEl("h3", { text: s.stSectionCard, cls: "note-gallery-settings-section" });
+
+    new Setting(containerEl)
+      .setName(s.stShowPreview)
+      .setDesc(s.stShowPreviewDesc)
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.showPreview)
+          .onChange(async (value) => { this.plugin.settings.showPreview = value; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stTitleWrap)
+      .setDesc(s.stTitleWrapDesc)
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.titleWrap)
+          .onChange(async (value) => { this.plugin.settings.titleWrap = value; await this.plugin.saveSettings(); })
+      );
 
     new Setting(containerEl)
       .setName(s.stThumbSize)
@@ -1010,6 +1077,9 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .onChange(async (value) => { this.plugin.settings.filesFolder = value.trim(); await this.plugin.saveSettings(); })
       );
 
+    // ── Sortierung & Ansichten / Sorting & Views ──────────────────
+    containerEl.createEl("h3", { text: s.stSectionSort, cls: "note-gallery-settings-section" });
+
     new Setting(containerEl)
       .setName(s.stSortBy)
       .setDesc(s.stSortByDesc)
@@ -1022,15 +1092,15 @@ class NoteGallerySettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName(s.stDateLocale)
-      .setDesc(s.stDateLocaleDesc)
-      .addDropdown(drop =>
-        drop.addOption("de-DE", "Deutsch (13. Okt. 2024)")
-          .addOption("en-US", "English (Oct 13, 2024)")
-          .addOption("en-GB", "English UK (13 Oct 2024)")
-          .setValue(this.plugin.settings.dateLocale)
-          .onChange(async (value) => { this.plugin.settings.dateLocale = value; await this.plugin.saveSettings(); })
+      .setName(s.stRecentCount)
+      .setDesc(s.stRecentCountDesc)
+      .addSlider(slider =>
+        slider.setLimits(5, 100, 5).setValue(this.plugin.settings.recentCount).setDynamicTooltip()
+          .onChange(async (value) => { this.plugin.settings.recentCount = value; await this.plugin.saveSettings(); })
       );
+
+    // ── Navigation & Layout ───────────────────────────────────────
+    containerEl.createEl("h3", { text: s.stSectionNav, cls: "note-gallery-settings-section" });
 
     new Setting(containerEl)
       .setName(s.stBackBtnPos)
@@ -1040,40 +1110,6 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .addOption("bottom-right", s.stBackRight)
           .setValue(this.plugin.settings.backButtonPosition)
           .onChange(async (value) => { this.plugin.settings.backButtonPosition = value as "bottom-left" | "bottom-right"; await this.plugin.saveSettings(); })
-      );
-
-    new Setting(containerEl)
-      .setName(s.stTitleWrap)
-      .setDesc(s.stTitleWrapDesc)
-      .addToggle(toggle =>
-        toggle.setValue(this.plugin.settings.titleWrap)
-          .onChange(async (value) => { this.plugin.settings.titleWrap = value; await this.plugin.saveSettings(); })
-      );
-
-    new Setting(containerEl)
-      .setName("Sprache / Language")
-      .setDesc("Sprache der Benutzeroberfläche / UI language")
-      .addDropdown(drop =>
-        drop.addOption("de", "Deutsch")
-          .addOption("en", "English")
-          .setValue(this.plugin.settings.language)
-          .onChange(async (value) => { this.plugin.settings.language = value as "de" | "en"; await this.plugin.saveSettings(); this.display(); })
-      );
-
-    new Setting(containerEl)
-      .setName(s.stRecentCount)
-      .setDesc(s.stRecentCountDesc)
-      .addSlider(slider =>
-        slider.setLimits(5, 100, 5).setValue(this.plugin.settings.recentCount).setDynamicTooltip()
-          .onChange(async (value) => { this.plugin.settings.recentCount = value; await this.plugin.saveSettings(); })
-      );
-
-    new Setting(containerEl)
-      .setName(s.stShowPreview)
-      .setDesc(s.stShowPreviewDesc)
-      .addToggle(toggle =>
-        toggle.setValue(this.plugin.settings.showPreview)
-          .onChange(async (value) => { this.plugin.settings.showPreview = value; await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)
