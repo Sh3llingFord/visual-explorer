@@ -1038,8 +1038,10 @@ class NoteGalleryView extends ItemView {
     const category = extractCategories(frontmatter);
     const dateStr = formatDate(frontmatter, file, dateLocale);
     const favorite = isFavorite(frontmatter);
+    const isCoverMode = frontmatter?.visualexplorercover === true;
 
     const card = listContainer.createDiv({ cls: "note-gallery-card" });
+    if (isCoverMode) card.addClass("note-gallery-card--cover");
 
     // Left: text
     const textDiv = card.createDiv({ cls: "note-gallery-text" });
@@ -1047,7 +1049,7 @@ class NoteGalleryView extends ItemView {
     if (favorite) titleRow.createSpan({ cls: "note-gallery-favorite-star", text: "★ " });
     const titleEl = titleRow.createSpan({ cls: "note-gallery-title" });
     titleEl.setText(file.basename);
-    if (titleWrap) titleEl.addClass("note-gallery-title--wrap");
+    if (titleWrap && !isCoverMode) titleEl.addClass("note-gallery-title--wrap");
 
     if (category) textDiv.createDiv({ cls: "note-gallery-category", text: category });
     textDiv.createDiv({ cls: "note-gallery-date", text: dateStr });
@@ -1058,10 +1060,6 @@ class NoteGalleryView extends ItemView {
 
     // Right: image
     if (imgPath) {
-      const imgDiv = card.createDiv({ cls: "note-gallery-thumb" });
-      imgDiv.style.width = thumbnailSize + "px";
-      imgDiv.style.height = thumbnailSize + "px";
-
       const pathsToTry = [
         imgPath,
         filesFolder + "/" + imgPath.split("/").pop(),
@@ -1078,9 +1076,19 @@ class NoteGalleryView extends ItemView {
 
       if (imgFile) {
         const url = this.app.vault.getResourcePath(imgFile);
-        const img = imgDiv.createEl("img");
-        img.src = url;
-        img.alt = file.basename;
+        if (isCoverMode) {
+          const coverDiv = card.createDiv({ cls: "note-gallery-cover-img" });
+          const img = coverDiv.createEl("img");
+          img.src = url;
+          img.alt = file.basename;
+        } else {
+          const imgDiv = card.createDiv({ cls: "note-gallery-thumb" });
+          imgDiv.style.width = thumbnailSize + "px";
+          imgDiv.style.height = thumbnailSize + "px";
+          const img = imgDiv.createEl("img");
+          img.src = url;
+          img.alt = file.basename;
+        }
       }
     }
 
@@ -1201,7 +1209,7 @@ class NoteGalleryView extends ItemView {
     const titleRow = textDiv.createDiv({ cls: "note-gallery-title-row" });
     const titleEl = titleRow.createSpan({ cls: "note-gallery-title" });
     titleEl.setText(file.name);
-    if (titleWrap) titleEl.addClass("note-gallery-title--wrap");
+    if (titleWrap && !isCoverMode) titleEl.addClass("note-gallery-title--wrap");
 
     textDiv.createDiv({ cls: "note-gallery-category", text: file.extension.toUpperCase() });
     textDiv.createDiv({ cls: "note-gallery-date", text: dateStr });
