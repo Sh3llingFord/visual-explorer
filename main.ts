@@ -1209,7 +1209,7 @@ class NoteGalleryView extends ItemView {
     const titleRow = textDiv.createDiv({ cls: "note-gallery-title-row" });
     const titleEl = titleRow.createSpan({ cls: "note-gallery-title" });
     titleEl.setText(file.name);
-    if (titleWrap && !isCoverMode) titleEl.addClass("note-gallery-title--wrap");
+    if (titleWrap) titleEl.addClass("note-gallery-title--wrap");
 
     textDiv.createDiv({ cls: "note-gallery-category", text: file.extension.toUpperCase() });
     textDiv.createDiv({ cls: "note-gallery-date", text: dateStr });
