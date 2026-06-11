@@ -266,7 +266,7 @@
   min-height: 80px;
 }
 .note-gallery-card--cover .note-gallery-text {
-  max-width: 70%;
+  max-width: 40%;
   padding-right: 8px;
   overflow: hidden;
 }
@@ -275,7 +275,7 @@
   right: 8px;
   top: 6px;
   bottom: 6px;
-  width: calc(30% - 8px);
+  width: calc(60% - 8px);
   border-radius: 8px;
   overflow: hidden;
 }
