@@ -241,6 +241,16 @@ function extractCategories(frontmatter: Record<string, unknown>): string {
   return "";
 }
 
+function getEffectiveCreatedTime(file: TFile, app: App): number {
+  const raw = app.metadataCache.getFileCache(file)?.frontmatter;
+  const val = raw?.date || raw?.created;
+  if (val) {
+    const d = new Date(String(val));
+    if (!isNaN(d.getTime())) return d.getTime();
+  }
+  return file.stat.ctime;
+}
+
 function formatDate(frontmatter: Record<string, unknown>, file: TFile, locale: string): string {
   const raw = frontmatter?.date || frontmatter?.created;
   if (raw) {
@@ -973,8 +983,8 @@ class NoteGalleryView extends ItemView {
     files = files.sort((a, b) => {
       if (sortBy === "name-asc")     return a.basename.localeCompare(b.basename);
       if (sortBy === "name-desc")    return b.basename.localeCompare(a.basename);
-      if (sortBy === "created-asc")  return a.stat.ctime - b.stat.ctime;
-      if (sortBy === "created-desc") return b.stat.ctime - a.stat.ctime;
+      if (sortBy === "created-asc")  return getEffectiveCreatedTime(a, this.app) - getEffectiveCreatedTime(b, this.app);
+      if (sortBy === "created-desc") return getEffectiveCreatedTime(b, this.app) - getEffectiveCreatedTime(a, this.app);
       if (sortBy === "modified-asc") return a.stat.mtime - b.stat.mtime;
       return b.stat.mtime - a.stat.mtime; // modified-desc (default)
     });

@@ -5,17 +5,23 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
 ## Features
 
 - **Card view** — each note shows title, category, date, image thumbnail, and optional text preview
-- **Folder navigation** — subfolders appear at the top as clickable entries with a breadcrumb trail
-- **Floating back button** — round button at the bottom (left or right, configurable) to navigate up
+- **Folder navigation** — subfolders always appear at the top as clickable entries with a breadcrumb trail
 - **Live search** — filter notes and folders by title or tag instantly
 - **+ button → action menu:**
+  - **Sort** — choose from 6 sort options with the active one highlighted (see below)
   - Favorites — shows all notes with `favorite: true` in frontmatter
   - Recently opened — shows the last N modified notes across the vault
   - New document — create a note directly in the current folder
   - Create folder — create a new subfolder
-- **Long-press (mobile) / right-click (desktop) → context menu:**
+- **Sorting** — select directly in the toolbar, per view session:
+  - Modified (newest → oldest / oldest → newest)
+  - Created (newest → oldest / oldest → newest) — respects `date`/`created` frontmatter
+  - Name (A → Z / Z → A) — applies to both notes and subfolders
+- **Long-press (mobile) / right-click (desktop) → context menu on notes:**
   - Add / remove favorite
   - Rename
+  - Move to folder — pick any vault folder from a searchable list
+  - Open in new tab
   - Delete (with confirmation)
 - **Favorites** — marked with ★ in the list, stored as `favorite: true` in frontmatter (usable by other plugins like Dataview)
 - **Note counter** — shows number of notes and subfolders in the toolbar
@@ -51,8 +57,19 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
 ### Navigation
 - **Subfolders** appear at the top with a › chevron and bold name — click to navigate into them
 - **Breadcrumb** at the top left shows the current path — click any segment to go back
-- **Floating ← button** at the bottom — navigates to the parent folder
 - **Search field** filters notes and folders live by title or tag
+
+### Sorting
+Tap the **+** button and select a sort option at the top of the menu. The active sort is marked with a checkmark. Sort state is per view session; the default is set in plugin settings.
+
+| Option | Description |
+|---|---|
+| Modified (newest first) | Default — by last file modification |
+| Modified (oldest first) | |
+| Created (newest first) | Uses `date`/`created` frontmatter if present, otherwise filesystem time |
+| Created (oldest first) | |
+| Name (A–Z) | Alphabetical — applies to subfolders too |
+| Name (Z–A) | |
 
 ### Actions via + button
 - **Favorites** — shows all favorited notes
@@ -63,6 +80,8 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
 ### Actions via long-press / right-click on a note
 - **Add / remove favorite** — sets `favorite: true` in frontmatter
 - **Rename** — rename the file
+- **Move to folder** — opens a searchable folder picker to move the note
+- **Open in new tab** — opens the note in a new Obsidian tab
 - **Delete** — moves the note to trash
 
 ## Settings
@@ -71,13 +90,14 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
 |---|---|---|
 | Thumbnail size | 72px | Width and height of the image preview (40–160px) |
 | Files folder | `Files` | Path to the folder containing images, relative to vault root |
-| Sort by | Modified date | Modified date / Created date / Name |
+| Default sort | Modified (newest first) | Default sort for new views |
 | Date format | de-DE | de-DE / en-US / en-GB |
-| Back button position | Bottom left | Bottom left (right-handed) / Bottom right (left-handed) |
 | Wrap title | Off | Allow long titles to wrap instead of being truncated |
 | Language | German | German / English |
 | Recent count | 30 | How many notes to show in "Recently opened" (5–100) |
 | Show preview | On | Show the first lines of note content |
+| Preview lines | 1 | Number of preview text lines (1 or 2) |
+| Favorites first | Off | Show favorited notes at the top of the folder view |
 | Breadcrumb font size | 12px | Font size of the breadcrumb path (10–18px) |
 
 ## Image support
@@ -105,7 +125,7 @@ favorite: true
 ---
 ```
 
-- `date` or `created` → displayed as the note date
+- `date` or `created` → displayed as the note date, and used for "Created" sort ordering
 - `categories` or `tags` → first value displayed as `#category`
 - `favorite: true` → note is marked with ★ and appears in the Favorites view (also usable by Dataview and other plugins)
 
