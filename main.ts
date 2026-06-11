@@ -1038,9 +1038,9 @@ class NoteGalleryView extends ItemView {
     const category = extractCategories(frontmatter);
     const dateStr = formatDate(frontmatter, file, dateLocale);
     const favorite = isFavorite(frontmatter);
-    const rawCover = frontmatter?.visualexplorercover;
+    const rawCover = frontmatter?.vec;
     const coverTags: string[] = Array.isArray(frontmatter?.tags) ? (frontmatter.tags as unknown[]).map(String) : [];
-    const isCoverMode = rawCover === true || String(rawCover).toLowerCase() === "true" || coverTags.includes("visualexplorercover");
+    const isCoverMode = rawCover === true || String(rawCover).toLowerCase() === "true" || coverTags.includes("vec");
 
     const card = listContainer.createDiv({ cls: "note-gallery-card" });
     if (isCoverMode) card.addClass("note-gallery-card--cover");
