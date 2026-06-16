@@ -30,14 +30,11 @@ interface NoteGallerySettings {
   previewLines: 1 | 2;
   sortFavoritesFirst: boolean;
   openOnStartup: boolean;
-  menuShowSortModifiedDesc: boolean;
-  menuShowSortModifiedAsc: boolean;
-  menuShowSortCreatedDesc: boolean;
-  menuShowSortCreatedAsc: boolean;
-  menuShowSortNameAsc: boolean;
-  menuShowSortNameDesc: boolean;
-  menuShowSortTitleDateDesc: boolean;
-  menuShowSortTitleDateAsc: boolean;
+  menuShowSortModified: boolean;
+  menuShowSortCreated: boolean;
+  menuShowSortName: boolean;
+  menuShowSortTitleDate: boolean;
+  menuShowSortNone: boolean;
   menuShowFavorites: boolean;
   menuShowRecent: boolean;
   menuShowNewDoc: boolean;
@@ -59,14 +56,11 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   previewLines: 1,
   sortFavoritesFirst: false,
   openOnStartup: false,
-  menuShowSortModifiedDesc: true,
-  menuShowSortModifiedAsc: true,
-  menuShowSortCreatedDesc: true,
-  menuShowSortCreatedAsc: true,
-  menuShowSortNameAsc: true,
-  menuShowSortNameDesc: true,
-  menuShowSortTitleDateDesc: true,
-  menuShowSortTitleDateAsc: true,
+  menuShowSortModified: true,
+  menuShowSortCreated: true,
+  menuShowSortName: true,
+  menuShowSortTitleDate: true,
+  menuShowSortNone: true,
   menuShowFavorites: true,
   menuShowRecent: true,
   menuShowNewDoc: true,
@@ -113,14 +107,11 @@ const STRINGS = {
     stFilesFolder: "Dateien-Ordner",
     stFilesFolderDesc: "Pfad zum Ordner mit Bilddateien (relativ zum Vault-Root)",
     sort: "Sortierung",
-    sortModifiedDesc: "Geändert (neu → alt)",
-    sortModifiedAsc: "Geändert (alt → neu)",
-    sortCreatedDesc: "Erstellt (neu → alt)",
-    sortCreatedAsc: "Erstellt (alt → neu)",
-    sortNameAsc: "Name (A–Z)",
-    sortNameDesc: "Name (Z–A)",
-    sortTitleDateDesc: "Titeldatum (neu → alt)",
-    sortTitleDateAsc: "Titeldatum (alt → neu)",
+    sortModified: "Geändert",
+    sortCreated: "Erstellt",
+    sortName: "Name",
+    sortTitleDate: "Titeldatum",
+    sortNone: "Keine Sortierung",
     stSortBy: "Sortierung",
     stSortByDesc: "Standard-Sortierung für neue Ansichten",
     stSortModified: "Geändert (neu → alt)",
@@ -200,14 +191,11 @@ const STRINGS = {
     stFilesFolder: "Files folder",
     stFilesFolderDesc: "Path to the folder with image files (relative to vault root)",
     sort: "Sort",
-    sortModifiedDesc: "Modified (newest first)",
-    sortModifiedAsc: "Modified (oldest first)",
-    sortCreatedDesc: "Created (newest first)",
-    sortCreatedAsc: "Created (oldest first)",
-    sortNameAsc: "Name (A–Z)",
-    sortNameDesc: "Name (Z–A)",
-    sortTitleDateDesc: "Title date (newest first)",
-    sortTitleDateAsc: "Title date (oldest first)",
+    sortModified: "Modified",
+    sortCreated: "Created",
+    sortName: "Name",
+    sortTitleDate: "Title date",
+    sortNone: "No sorting",
     stSortBy: "Sort by",
     stSortByDesc: "Default sort for new views",
     stSortModified: "Modified (newest first)",
@@ -842,16 +830,12 @@ class NoteGalleryView extends ItemView {
     newBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       const ms = this.plugin.settings;
-      const sortOptions = [
-        ms.menuShowSortModifiedDesc  && { value: "modified-desc",   label: s.sortModifiedDesc },
-        ms.menuShowSortModifiedAsc   && { value: "modified-asc",    label: s.sortModifiedAsc },
-        ms.menuShowSortCreatedDesc   && { value: "created-desc",    label: s.sortCreatedDesc },
-        ms.menuShowSortCreatedAsc    && { value: "created-asc",     label: s.sortCreatedAsc },
-        ms.menuShowSortNameAsc       && { value: "name-asc",        label: s.sortNameAsc },
-        ms.menuShowSortNameDesc      && { value: "name-desc",       label: s.sortNameDesc },
-        ms.menuShowSortTitleDateDesc && { value: "title-date-desc", label: s.sortTitleDateDesc },
-        ms.menuShowSortTitleDateAsc  && { value: "title-date-asc",  label: s.sortTitleDateAsc },
-      ].filter(Boolean) as { value: string; label: string }[];
+      const sortTypes: { show: boolean; label: string; asc: string; desc: string; defaultDir: "asc" | "desc" }[] = [
+        { show: ms.menuShowSortModified,  label: s.sortModified,  asc: "modified-asc",   desc: "modified-desc",   defaultDir: "desc" },
+        { show: ms.menuShowSortCreated,   label: s.sortCreated,   asc: "created-asc",    desc: "created-desc",    defaultDir: "desc" },
+        { show: ms.menuShowSortName,      label: s.sortName,      asc: "name-asc",       desc: "name-desc",       defaultDir: "asc" },
+        { show: ms.menuShowSortTitleDate, label: s.sortTitleDate, asc: "title-date-asc", desc: "title-date-desc", defaultDir: "desc" },
+      ].filter(t => t.show);
 
       const menu = new Menu();
       let hasItems = false;
@@ -861,15 +845,29 @@ class NoteGalleryView extends ItemView {
         hasItems = true;
       };
 
-      if (sortOptions.length) {
+      if (sortTypes.length || ms.menuShowSortNone) {
         addGroup(() => {
-          for (const opt of sortOptions) {
+          for (const t of sortTypes) {
+            const isAsc = this.currentSort === t.asc;
+            const isDesc = this.currentSort === t.desc;
             menu.addItem(item => {
-              item.setTitle(opt.label);
-              item.setIcon("arrow-up-down");
-              item.setChecked(this.currentSort === opt.value);
+              item.setTitle(t.label);
+              item.setIcon(isAsc ? "arrow-up" : isDesc ? "arrow-down" : "arrow-up-down");
+              item.setChecked(isAsc || isDesc);
               item.onClick(async () => {
-                this.currentSort = opt.value;
+                this.currentSort = isAsc ? t.desc : isDesc ? t.asc : (t.defaultDir === "asc" ? t.asc : t.desc);
+                const lc = container.querySelector(".note-gallery-list") as HTMLElement;
+                if (lc) await this.renderList(lc, filesFolder, dateLocale, this.currentSort, titleWrap, thumbnailSize);
+              });
+            });
+          }
+          if (ms.menuShowSortNone) {
+            menu.addItem(item => {
+              item.setTitle(s.sortNone);
+              item.setIcon("rotate-ccw");
+              item.setChecked(this.currentSort === ms.sortBy);
+              item.onClick(async () => {
+                this.currentSort = ms.sortBy;
                 const lc = container.querySelector(".note-gallery-list") as HTMLElement;
                 if (lc) await this.renderList(lc, filesFolder, dateLocale, this.currentSort, titleWrap, thumbnailSize);
               });
@@ -1578,28 +1576,24 @@ class NoteGallerySettingTab extends PluginSettingTab {
     containerEl.createEl("h3", { text: s.stSectionMenu, cls: "note-gallery-settings-section" });
 
     type MenuToggleKey =
-      | "menuShowSortModifiedDesc" | "menuShowSortModifiedAsc"
-      | "menuShowSortCreatedDesc"  | "menuShowSortCreatedAsc"
-      | "menuShowSortNameAsc"      | "menuShowSortNameDesc"
-      | "menuShowSortTitleDateDesc" | "menuShowSortTitleDateAsc"
+      | "menuShowSortModified" | "menuShowSortCreated"
+      | "menuShowSortName"     | "menuShowSortTitleDate"
+      | "menuShowSortNone"
       | "menuShowFavorites" | "menuShowRecent"
       | "menuShowNewDoc"    | "menuShowCreateFolder"
       | "menuShowOpenSettings";
 
     const menuToggles: { key: MenuToggleKey; label: string }[] = [
-      { key: "menuShowSortModifiedDesc",  label: s.sortModifiedDesc },
-      { key: "menuShowSortModifiedAsc",   label: s.sortModifiedAsc },
-      { key: "menuShowSortCreatedDesc",   label: s.sortCreatedDesc },
-      { key: "menuShowSortCreatedAsc",    label: s.sortCreatedAsc },
-      { key: "menuShowSortNameAsc",       label: s.sortNameAsc },
-      { key: "menuShowSortNameDesc",      label: s.sortNameDesc },
-      { key: "menuShowSortTitleDateDesc", label: s.sortTitleDateDesc },
-      { key: "menuShowSortTitleDateAsc",  label: s.sortTitleDateAsc },
-      { key: "menuShowFavorites",         label: s.favorites },
-      { key: "menuShowRecent",            label: s.recent },
-      { key: "menuShowNewDoc",            label: s.newDoc },
-      { key: "menuShowCreateFolder",      label: s.createFolder },
-      { key: "menuShowOpenSettings",      label: s.openSettings },
+      { key: "menuShowSortModified",  label: s.sortModified },
+      { key: "menuShowSortCreated",   label: s.sortCreated },
+      { key: "menuShowSortName",      label: s.sortName },
+      { key: "menuShowSortTitleDate", label: s.sortTitleDate },
+      { key: "menuShowSortNone",      label: s.sortNone },
+      { key: "menuShowFavorites",     label: s.favorites },
+      { key: "menuShowRecent",        label: s.recent },
+      { key: "menuShowNewDoc",        label: s.newDoc },
+      { key: "menuShowCreateFolder",  label: s.createFolder },
+      { key: "menuShowOpenSettings",  label: s.openSettings },
     ];
 
     for (const { key, label } of menuToggles) {
