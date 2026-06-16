@@ -322,6 +322,17 @@ function isFavorite(frontmatter: Record<string, unknown>): boolean {
   return frontmatter?.favorite === true;
 }
 
+function matchesSearch(file: TFile, app: App, q: string): boolean {
+  if (!q) return true;
+  if (file.basename.toLowerCase().includes(q)) return true;
+  const meta = app.metadataCache.getFileCache(file);
+  const tags = [
+    ...(Array.isArray(meta?.frontmatter?.tags) ? meta.frontmatter.tags : []),
+    ...(Array.isArray(meta?.frontmatter?.categories) ? meta.frontmatter.categories : []),
+  ];
+  return tags.some(t => String(t).toLowerCase().includes(q));
+}
+
 // ── Modals ───────────────────────────────────────────────────────────────────
 
 class ConfirmDeleteModal extends Modal {
@@ -945,15 +956,7 @@ class NoteGalleryView extends ItemView {
         });
       }
 
-      if (q) files = files.filter(f => {
-        if (f.basename.toLowerCase().includes(q)) return true;
-        const meta = this.app.metadataCache.getFileCache(f);
-        const tags = [
-          ...(Array.isArray(meta?.frontmatter?.tags) ? meta.frontmatter.tags : []),
-          ...(Array.isArray(meta?.frontmatter?.categories) ? meta.frontmatter.categories : []),
-        ];
-        return tags.some(t => String(t).toLowerCase().includes(q));
-      });
+      if (q) files = files.filter(f => matchesSearch(f, this.app, q));
 
       // Counter
       const toolbar = this.containerEl.querySelector(".note-gallery-toolbar") as HTMLElement;
@@ -973,9 +976,8 @@ class NoteGalleryView extends ItemView {
     }
 
     // ── Folder mode ──────────────────────────────────────────
-    const subfolders = this.folder.children
+    const subfolders = q ? [] : this.folder.children
       .filter((f): f is TFolder => f instanceof TFolder)
-      .filter(f => !q || f.name.toLowerCase().includes(q))
       .sort((a, b) => sortBy === "name-desc"
         ? b.name.localeCompare(a.name)
         : a.name.localeCompare(b.name));
@@ -1055,18 +1057,9 @@ class NoteGalleryView extends ItemView {
       card.addEventListener("click", () => this.navigateTo(subfolder));
     }
 
-    let files = this.folder.children
-      .filter((f): f is TFile => f instanceof TFile)
-      .filter(f => {
-        if (!q) return true;
-        if (f.name.toLowerCase().includes(q)) return true;
-        const meta = this.app.metadataCache.getFileCache(f);
-        const tags = [
-          ...(Array.isArray(meta?.frontmatter?.tags) ? meta.frontmatter.tags : []),
-          ...(Array.isArray(meta?.frontmatter?.categories) ? meta.frontmatter.categories : []),
-        ];
-        return tags.some(t => String(t).toLowerCase().includes(q));
-      });
+    let files: TFile[] = q
+      ? this.app.vault.getFiles().filter(f => matchesSearch(f, this.app, q))
+      : this.folder.children.filter((f): f is TFile => f instanceof TFile);
 
     files = files.sort((a, b) => {
       if (sortBy === "name-asc")     return a.basename.localeCompare(b.basename);
