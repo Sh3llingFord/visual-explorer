@@ -14,11 +14,14 @@ import {
 
 const VIEW_TYPE = "visual-explorer";
 
+type TitleDateFormat = "dd.mm.yyyy" | "yyyy.mm.dd" | "mm.dd.yyyy" | "dd-mm-yyyy" | "yyyy-mm-dd" | "mm-dd-yyyy";
+
 interface NoteGallerySettings {
   thumbnailSize: number;
   filesFolder: string;
   dateLocale: string;
-  sortBy: "modified-desc" | "modified-asc" | "created-desc" | "created-asc" | "name-asc" | "name-desc";
+  sortBy: "modified-desc" | "modified-asc" | "created-desc" | "created-asc" | "name-asc" | "name-desc" | "title-date-desc" | "title-date-asc";
+  titleDateFormat: TitleDateFormat;
   titleWrap: boolean;
   language: "de" | "en";
   recentCount: number;
@@ -34,6 +37,7 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   filesFolder: "Files",
   dateLocale: "de-DE",
   sortBy: "modified-desc",
+  titleDateFormat: "dd.mm.yyyy",
   titleWrap: false,
   language: "de",
   recentCount: 30,
@@ -89,6 +93,8 @@ const STRINGS = {
     sortCreatedAsc: "Erstellt (alt → neu)",
     sortNameAsc: "Name (A–Z)",
     sortNameDesc: "Name (Z–A)",
+    sortTitleDateDesc: "Titeldatum (neu → alt)",
+    sortTitleDateAsc: "Titeldatum (alt → neu)",
     stSortBy: "Sortierung",
     stSortByDesc: "Standard-Sortierung für neue Ansichten",
     stSortModified: "Geändert (neu → alt)",
@@ -97,6 +103,10 @@ const STRINGS = {
     stSortModifiedAsc: "Geändert (alt → neu)",
     stSortNameAsc: "Name (A–Z)",
     stSortNameDesc: "Name (Z–A)",
+    stSortTitleDateDesc: "Titeldatum (neu → alt)",
+    stSortTitleDateAsc: "Titeldatum (alt → neu)",
+    stTitleDateFormat: "Datumsformat im Titel",
+    stTitleDateFormatDesc: "Format des Datums am Anfang des Notiztitels, z. B. für Notizen wie '16.06.2026 Meeting' (nur für die Sortierung 'Titeldatum' relevant).",
     stDateLocale: "Datumsformat",
     stDateLocaleDesc: "Sprache für die Datumsanzeige",
     stTitleWrap: "Titel umbrechen",
@@ -168,6 +178,8 @@ const STRINGS = {
     sortCreatedAsc: "Created (oldest first)",
     sortNameAsc: "Name (A–Z)",
     sortNameDesc: "Name (Z–A)",
+    sortTitleDateDesc: "Title date (newest first)",
+    sortTitleDateAsc: "Title date (oldest first)",
     stSortBy: "Sort by",
     stSortByDesc: "Default sort for new views",
     stSortModified: "Modified (newest first)",
@@ -176,6 +188,10 @@ const STRINGS = {
     stSortModifiedAsc: "Modified (oldest first)",
     stSortNameAsc: "Name (A–Z)",
     stSortNameDesc: "Name (Z–A)",
+    stSortTitleDateDesc: "Title date (newest first)",
+    stSortTitleDateAsc: "Title date (oldest first)",
+    stTitleDateFormat: "Title date format",
+    stTitleDateFormatDesc: "Format of the date at the start of note titles, e.g. for notes like '16.06.2026 Meeting' (only relevant for the 'Title date' sort).",
     stDateLocale: "Date format",
     stDateLocaleDesc: "Language for date display",
     stTitleWrap: "Wrap title",
@@ -249,6 +265,28 @@ function getEffectiveCreatedTime(file: TFile, app: App): number {
     if (!isNaN(d.getTime())) return d.getTime();
   }
   return file.stat.ctime;
+}
+
+const TITLE_DATE_FORMATS: Record<TitleDateFormat, { order: ("d" | "m" | "y")[]; sep: string }> = {
+  "dd.mm.yyyy": { order: ["d", "m", "y"], sep: "." },
+  "yyyy.mm.dd": { order: ["y", "m", "d"], sep: "." },
+  "mm.dd.yyyy": { order: ["m", "d", "y"], sep: "." },
+  "dd-mm-yyyy": { order: ["d", "m", "y"], sep: "-" },
+  "yyyy-mm-dd": { order: ["y", "m", "d"], sep: "-" },
+  "mm-dd-yyyy": { order: ["m", "d", "y"], sep: "-" },
+};
+
+function getTitleDateTime(file: TFile, format: TitleDateFormat): number | null {
+  const { order, sep } = TITLE_DATE_FORMATS[format];
+  const re = new RegExp(`^(\\d{2,4})\\${sep}(\\d{2})\\${sep}(\\d{2,4})`);
+  const match = file.basename.match(re);
+  if (!match) return null;
+  const parts: Record<string, number> = {};
+  order.forEach((key, i) => { parts[key] = parseInt(match[i + 1], 10); });
+  const { d, m, y } = parts as { d: number; m: number; y: number };
+  const date = new Date(y, m - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+  return date.getTime();
 }
 
 function formatDate(frontmatter: Record<string, unknown>, file: TFile, locale: string): string {
@@ -774,12 +812,14 @@ class NoteGalleryView extends ItemView {
     newBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       const sortOptions: { value: string; label: string }[] = [
-        { value: "modified-desc", label: s.sortModifiedDesc },
-        { value: "modified-asc",  label: s.sortModifiedAsc },
-        { value: "created-desc",  label: s.sortCreatedDesc },
-        { value: "created-asc",   label: s.sortCreatedAsc },
-        { value: "name-asc",      label: s.sortNameAsc },
-        { value: "name-desc",     label: s.sortNameDesc },
+        { value: "modified-desc",  label: s.sortModifiedDesc },
+        { value: "modified-asc",   label: s.sortModifiedAsc },
+        { value: "created-desc",   label: s.sortCreatedDesc },
+        { value: "created-asc",    label: s.sortCreatedAsc },
+        { value: "name-asc",       label: s.sortNameAsc },
+        { value: "name-desc",      label: s.sortNameDesc },
+        { value: "title-date-desc", label: s.sortTitleDateDesc },
+        { value: "title-date-asc",  label: s.sortTitleDateAsc },
       ];
       const menu = new Menu();
       for (const opt of sortOptions) {
@@ -986,6 +1026,12 @@ class NoteGalleryView extends ItemView {
       if (sortBy === "created-asc")  return getEffectiveCreatedTime(a, this.app) - getEffectiveCreatedTime(b, this.app);
       if (sortBy === "created-desc") return getEffectiveCreatedTime(b, this.app) - getEffectiveCreatedTime(a, this.app);
       if (sortBy === "modified-asc") return a.stat.mtime - b.stat.mtime;
+      if (sortBy === "title-date-asc" || sortBy === "title-date-desc") {
+        const format = this.plugin.settings.titleDateFormat;
+        const ta = getTitleDateTime(a, format) ?? getEffectiveCreatedTime(a, this.app);
+        const tb = getTitleDateTime(b, format) ?? getEffectiveCreatedTime(b, this.app);
+        return sortBy === "title-date-asc" ? ta - tb : tb - ta;
+      }
       return b.stat.mtime - a.stat.mtime; // modified-desc (default)
     });
 
@@ -1444,17 +1490,31 @@ class NoteGallerySettingTab extends PluginSettingTab {
       .setDesc(s.stSortByDesc)
       .addDropdown(drop =>
         drop.addOption("modified-desc", s.stSortModified)
-          .addOption("modified-asc",  s.stSortModifiedAsc)
-          .addOption("created-desc",  s.stSortCreatedDesc)
-          .addOption("created-asc",   s.stSortCreatedAsc)
-          .addOption("name-asc",      s.stSortNameAsc)
-          .addOption("name-desc",     s.stSortNameDesc)
+          .addOption("modified-asc",   s.stSortModifiedAsc)
+          .addOption("created-desc",   s.stSortCreatedDesc)
+          .addOption("created-asc",    s.stSortCreatedAsc)
+          .addOption("name-asc",       s.stSortNameAsc)
+          .addOption("name-desc",      s.stSortNameDesc)
+          .addOption("title-date-desc", s.stSortTitleDateDesc)
+          .addOption("title-date-asc",  s.stSortTitleDateAsc)
           .setValue(this.plugin.settings.sortBy)
           .onChange(async (value) => {
             this.plugin.settings.sortBy = value as NoteGallerySettings["sortBy"];
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(containerEl)
+      .setName(s.stTitleDateFormat)
+      .setDesc(s.stTitleDateFormatDesc)
+      .addDropdown(drop => {
+        (Object.keys(TITLE_DATE_FORMATS) as TitleDateFormat[]).forEach(f => drop.addOption(f, f));
+        drop.setValue(this.plugin.settings.titleDateFormat)
+          .onChange(async (value) => {
+            this.plugin.settings.titleDateFormat = value as TitleDateFormat;
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName(s.stRecentCount)
