@@ -30,6 +30,19 @@ interface NoteGallerySettings {
   previewLines: 1 | 2;
   sortFavoritesFirst: boolean;
   openOnStartup: boolean;
+  menuShowSortModifiedDesc: boolean;
+  menuShowSortModifiedAsc: boolean;
+  menuShowSortCreatedDesc: boolean;
+  menuShowSortCreatedAsc: boolean;
+  menuShowSortNameAsc: boolean;
+  menuShowSortNameDesc: boolean;
+  menuShowSortTitleDateDesc: boolean;
+  menuShowSortTitleDateAsc: boolean;
+  menuShowFavorites: boolean;
+  menuShowRecent: boolean;
+  menuShowNewDoc: boolean;
+  menuShowCreateFolder: boolean;
+  menuShowOpenSettings: boolean;
 }
 
 const DEFAULT_SETTINGS: NoteGallerySettings = {
@@ -46,6 +59,19 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   previewLines: 1,
   sortFavoritesFirst: false,
   openOnStartup: false,
+  menuShowSortModifiedDesc: true,
+  menuShowSortModifiedAsc: true,
+  menuShowSortCreatedDesc: true,
+  menuShowSortCreatedAsc: true,
+  menuShowSortNameAsc: true,
+  menuShowSortNameDesc: true,
+  menuShowSortTitleDateDesc: true,
+  menuShowSortTitleDateAsc: true,
+  menuShowFavorites: true,
+  menuShowRecent: true,
+  menuShowNewDoc: true,
+  menuShowCreateFolder: true,
+  menuShowOpenSettings: true,
 };
 
 const STRINGS = {
@@ -126,6 +152,8 @@ const STRINGS = {
     stSectionGeneral: "Allgemein",
     stSectionCard: "Kartenanzeige",
     stSectionSort: "Sortierung & Ansichten",
+    stSectionMenu: "Menü-Inhalt",
+    stMenuItemDesc: "Diesen Eintrag im \"+\"-Menü anzeigen",
     stSectionNav: "Navigation & Layout",
     openSettings: "Einstellungen öffnen",
     openInNewTab: "In neuem Tab öffnen",
@@ -211,6 +239,8 @@ const STRINGS = {
     stSectionGeneral: "General",
     stSectionCard: "Card Display",
     stSectionSort: "Sorting & Views",
+    stSectionMenu: "Menu content",
+    stMenuItemDesc: "Show this entry in the \"+\" menu",
     stSectionNav: "Navigation & Layout",
     openSettings: "Open settings",
     openInNewTab: "Open in new tab",
@@ -811,44 +841,60 @@ class NoteGalleryView extends ItemView {
     newBtn.title = s.actions;
     newBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      const sortOptions: { value: string; label: string }[] = [
-        { value: "modified-desc",  label: s.sortModifiedDesc },
-        { value: "modified-asc",   label: s.sortModifiedAsc },
-        { value: "created-desc",   label: s.sortCreatedDesc },
-        { value: "created-asc",    label: s.sortCreatedAsc },
-        { value: "name-asc",       label: s.sortNameAsc },
-        { value: "name-desc",      label: s.sortNameDesc },
-        { value: "title-date-desc", label: s.sortTitleDateDesc },
-        { value: "title-date-asc",  label: s.sortTitleDateAsc },
-      ];
+      const ms = this.plugin.settings;
+      const sortOptions = [
+        ms.menuShowSortModifiedDesc  && { value: "modified-desc",   label: s.sortModifiedDesc },
+        ms.menuShowSortModifiedAsc   && { value: "modified-asc",    label: s.sortModifiedAsc },
+        ms.menuShowSortCreatedDesc   && { value: "created-desc",    label: s.sortCreatedDesc },
+        ms.menuShowSortCreatedAsc    && { value: "created-asc",     label: s.sortCreatedAsc },
+        ms.menuShowSortNameAsc       && { value: "name-asc",        label: s.sortNameAsc },
+        ms.menuShowSortNameDesc      && { value: "name-desc",       label: s.sortNameDesc },
+        ms.menuShowSortTitleDateDesc && { value: "title-date-desc", label: s.sortTitleDateDesc },
+        ms.menuShowSortTitleDateAsc  && { value: "title-date-asc",  label: s.sortTitleDateAsc },
+      ].filter(Boolean) as { value: string; label: string }[];
+
       const menu = new Menu();
-      for (const opt of sortOptions) {
-        menu.addItem(item => {
-          item.setTitle(opt.label);
-          item.setIcon("arrow-up-down");
-          item.setChecked(this.currentSort === opt.value);
-          item.onClick(async () => {
-            this.currentSort = opt.value;
-            const lc = container.querySelector(".note-gallery-list") as HTMLElement;
-            if (lc) await this.renderList(lc, filesFolder, dateLocale, this.currentSort, titleWrap, thumbnailSize);
-          });
+      let hasItems = false;
+      const addGroup = (build: () => void) => {
+        if (hasItems) menu.addSeparator();
+        build();
+        hasItems = true;
+      };
+
+      if (sortOptions.length) {
+        addGroup(() => {
+          for (const opt of sortOptions) {
+            menu.addItem(item => {
+              item.setTitle(opt.label);
+              item.setIcon("arrow-up-down");
+              item.setChecked(this.currentSort === opt.value);
+              item.onClick(async () => {
+                this.currentSort = opt.value;
+                const lc = container.querySelector(".note-gallery-list") as HTMLElement;
+                if (lc) await this.renderList(lc, filesFolder, dateLocale, this.currentSort, titleWrap, thumbnailSize);
+              });
+            });
+          }
         });
       }
-      menu.addSeparator();
-      menu.addItem(item => {
+
+      const navBuilders: (() => void)[] = [];
+      if (ms.menuShowFavorites) navBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.favorites).setIcon("star");
         item.onClick(() => { this.mode = "favorites"; this.searchQuery = ""; this.render(); });
-      });
-      menu.addItem(item => {
+      }));
+      if (ms.menuShowRecent) navBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.recent).setIcon("clock");
         item.onClick(() => { this.mode = "recent"; this.searchQuery = ""; this.render(); });
-      });
-      menu.addSeparator();
-      menu.addItem(item => {
+      }));
+      if (navBuilders.length) addGroup(() => navBuilders.forEach(b => b()));
+
+      const createBuilders: (() => void)[] = [];
+      if (ms.menuShowNewDoc) createBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.newDoc).setIcon("file-plus");
         item.onClick(async () => { await this.createNoteWithName(this.folder.path); });
-      });
-      menu.addItem(item => {
+      }));
+      if (ms.menuShowCreateFolder) createBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.createFolder).setIcon("folder-plus");
         item.onClick(() => {
           new CreateFolderModal(this.app, this.folder.path, s, async (name) => {
@@ -857,15 +903,19 @@ class NoteGalleryView extends ItemView {
             await this.render();
           }).open();
         });
-      });
-      menu.addSeparator();
-      menu.addItem(item => {
-        item.setTitle(s.openSettings).setIcon("settings");
-        item.onClick(() => {
-          (this.app as any).setting.open();
-          (this.app as any).setting.openTabById("visual-explorer");
-        });
-      });
+      }));
+      if (createBuilders.length) addGroup(() => createBuilders.forEach(b => b()));
+
+      if (ms.menuShowOpenSettings) {
+        addGroup(() => menu.addItem(item => {
+          item.setTitle(s.openSettings).setIcon("settings");
+          item.onClick(() => {
+            (this.app as any).setting.open();
+            (this.app as any).setting.openTabById("visual-explorer");
+          });
+        }));
+      }
+
       if (e instanceof MouseEvent) menu.showAtMouseEvent(e);
       else { const t = e.touches[0] || e.changedTouches[0]; menu.showAtPosition({ x: t.clientX, y: t.clientY }); }
     });
@@ -1523,6 +1573,47 @@ class NoteGallerySettingTab extends PluginSettingTab {
         slider.setLimits(5, 100, 5).setValue(this.plugin.settings.recentCount).setDynamicTooltip()
           .onChange(async (value) => { this.plugin.settings.recentCount = value; await this.plugin.saveSettings(); })
       );
+
+    // ── Menü-Inhalt / Menu content ─────────────────────────────────
+    containerEl.createEl("h3", { text: s.stSectionMenu, cls: "note-gallery-settings-section" });
+
+    type MenuToggleKey =
+      | "menuShowSortModifiedDesc" | "menuShowSortModifiedAsc"
+      | "menuShowSortCreatedDesc"  | "menuShowSortCreatedAsc"
+      | "menuShowSortNameAsc"      | "menuShowSortNameDesc"
+      | "menuShowSortTitleDateDesc" | "menuShowSortTitleDateAsc"
+      | "menuShowFavorites" | "menuShowRecent"
+      | "menuShowNewDoc"    | "menuShowCreateFolder"
+      | "menuShowOpenSettings";
+
+    const menuToggles: { key: MenuToggleKey; label: string }[] = [
+      { key: "menuShowSortModifiedDesc",  label: s.sortModifiedDesc },
+      { key: "menuShowSortModifiedAsc",   label: s.sortModifiedAsc },
+      { key: "menuShowSortCreatedDesc",   label: s.sortCreatedDesc },
+      { key: "menuShowSortCreatedAsc",    label: s.sortCreatedAsc },
+      { key: "menuShowSortNameAsc",       label: s.sortNameAsc },
+      { key: "menuShowSortNameDesc",      label: s.sortNameDesc },
+      { key: "menuShowSortTitleDateDesc", label: s.sortTitleDateDesc },
+      { key: "menuShowSortTitleDateAsc",  label: s.sortTitleDateAsc },
+      { key: "menuShowFavorites",         label: s.favorites },
+      { key: "menuShowRecent",            label: s.recent },
+      { key: "menuShowNewDoc",            label: s.newDoc },
+      { key: "menuShowCreateFolder",      label: s.createFolder },
+      { key: "menuShowOpenSettings",      label: s.openSettings },
+    ];
+
+    for (const { key, label } of menuToggles) {
+      new Setting(containerEl)
+        .setName(label)
+        .setDesc(s.stMenuItemDesc)
+        .addToggle(toggle =>
+          toggle.setValue(this.plugin.settings[key])
+            .onChange(async (value) => {
+              this.plugin.settings[key] = value;
+              await this.plugin.saveSettings();
+            })
+        );
+    }
 
     // ── Navigation & Layout ───────────────────────────────────────
     containerEl.createEl("h3", { text: s.stSectionNav, cls: "note-gallery-settings-section" });
