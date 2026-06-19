@@ -611,9 +611,11 @@ class NoteGalleryView extends ItemView {
 
   async setState(state: Record<string, unknown>, result: { history: boolean }): Promise<void> {
     const path = state?.folderPath as string | undefined;
-    if (path) {
+    if (path !== undefined) {
       this.folderPath = path;
-      const found = this.app.vault.getAbstractFileByPath(path);
+      const found = path === ""
+        ? this.app.vault.getRoot()
+        : this.app.vault.getAbstractFileByPath(path);
       if (found instanceof TFolder) {
         this.folder = found;
         this.breadcrumb = this.computeBreadcrumb(found);
@@ -896,7 +898,7 @@ class NoteGalleryView extends ItemView {
         item.setTitle(s.createFolder).setIcon("folder-plus");
         item.onClick(() => {
           new CreateFolderModal(this.app, this.folder.path, s, async (name) => {
-            const path = this.folder.path + "/" + name;
+            const path = (this.folder.path ? this.folder.path + "/" : "") + name;
             await this.app.vault.createFolder(path);
             await this.render();
           }).open();
@@ -1007,7 +1009,7 @@ class NoteGalleryView extends ItemView {
             icon: "pencil",
             action: () => {
               new RenameFolderModal(this.app, subfolder, s, async (newName) => {
-                const newPath = (subfolder.parent?.path ?? "") + "/" + newName;
+                const newPath = (subfolder.parent?.path ? subfolder.parent.path + "/" : "") + newName;
                 await this.app.fileManager.renameFile(subfolder, newPath);
                 await this.render();
               }).open();
@@ -1160,7 +1162,7 @@ class NoteGalleryView extends ItemView {
         filesFolder + "/" + imgPath.split("/").pop(),
         "Vault/" + imgPath,
         "Vault/" + filesFolder + "/" + imgPath.split("/").pop(),
-        file.parent?.path + "/" + imgPath,
+        (file.parent?.path ? file.parent.path + "/" : "") + imgPath,
       ].filter(Boolean) as string[];
 
       let imgFile: TFile | null = null;
@@ -1208,7 +1210,7 @@ class NoteGalleryView extends ItemView {
           icon: "pencil",
           action: () => {
             new RenameModal(this.app, file, s, async (newName) => {
-              const newPath = file.parent?.path + "/" + newName + ".md";
+              const newPath = (file.parent?.path ? file.parent.path + "/" : "") + newName + ".md";
               await this.app.fileManager.renameFile(file, newPath);
               await this.render();
             }).open();
@@ -1328,7 +1330,7 @@ class NoteGalleryView extends ItemView {
           icon: "pencil",
           action: () => {
             new RenameModal(this.app, file, s, async (newName) => {
-              const newPath = file.parent?.path + "/" + newName + "." + file.extension;
+              const newPath = (file.parent?.path ? file.parent.path + "/" : "") + newName + "." + file.extension;
               await this.app.fileManager.renameFile(file, newPath);
               await this.render();
             }).open();
