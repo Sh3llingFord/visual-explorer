@@ -921,6 +921,15 @@ class NoteGalleryView extends ItemView {
     });
   }
 
+  private collectFilesRecursively(folder: TFolder): TFile[] {
+    const result: TFile[] = [];
+    for (const child of folder.children) {
+      if (child instanceof TFile) result.push(child);
+      else if (child instanceof TFolder) result.push(...this.collectFilesRecursively(child));
+    }
+    return result;
+  }
+
   async renderList(
     listContainer: HTMLElement,
     filesFolder: string,
@@ -975,9 +984,9 @@ class NoteGalleryView extends ItemView {
     }
 
     // ── Folder mode ──────────────────────────────────────────
-    const subfolders = this.folder.children
+    // When a search query is active, skip folder cards and search all files recursively.
+    const subfolders = q ? [] : this.folder.children
       .filter((f): f is TFolder => f instanceof TFolder)
-      .filter(f => !q || f.name.toLowerCase().includes(q))
       .sort((a, b) => sortBy === "name-desc"
         ? b.name.localeCompare(a.name)
         : a.name.localeCompare(b.name));
@@ -1057,18 +1066,20 @@ class NoteGalleryView extends ItemView {
       card.addEventListener("click", () => this.navigateTo(subfolder));
     }
 
-    let files = this.folder.children
-      .filter((f): f is TFile => f instanceof TFile)
-      .filter(f => {
-        if (!q) return true;
-        if (f.name.toLowerCase().includes(q)) return true;
-        const meta = this.app.metadataCache.getFileCache(f);
-        const tags = [
-          ...(Array.isArray(meta?.frontmatter?.tags) ? meta.frontmatter.tags : []),
-          ...(Array.isArray(meta?.frontmatter?.categories) ? meta.frontmatter.categories : []),
-        ];
-        return tags.some(t => String(t).toLowerCase().includes(q));
-      });
+    const filePool = q
+      ? this.collectFilesRecursively(this.folder)
+      : this.folder.children.filter((f): f is TFile => f instanceof TFile);
+
+    let files = filePool.filter(f => {
+      if (!q) return true;
+      if (f.name.toLowerCase().includes(q)) return true;
+      const meta = this.app.metadataCache.getFileCache(f);
+      const tags = [
+        ...(Array.isArray(meta?.frontmatter?.tags) ? meta.frontmatter.tags : []),
+        ...(Array.isArray(meta?.frontmatter?.categories) ? meta.frontmatter.categories : []),
+      ];
+      return tags.some(t => String(t).toLowerCase().includes(q));
+    });
 
     files = files.sort((a, b) => {
       if (sortBy === "name-asc")     return a.basename.localeCompare(b.basename);
