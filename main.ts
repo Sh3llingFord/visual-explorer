@@ -594,6 +594,7 @@ class NoteGalleryView extends ItemView {
   private mode: "folder" | "recent" | "favorites" = "folder";
   private currentSort: string = "modified-desc";
   private _viewportCleanup?: () => void;
+  private _listRenderGen = 0;
 
   constructor(leaf: WorkspaceLeaf, folder: TFolder, plugin: NoteGalleryPlugin) {
     super(leaf);
@@ -938,6 +939,7 @@ class NoteGalleryView extends ItemView {
     titleWrap: boolean,
     thumbnailSize: number
   ) {
+    const gen = ++this._listRenderGen;
     listContainer.empty();
     const { language, recentCount, showPreview } = this.plugin.settings;
     const s = STRINGS[language];
@@ -976,6 +978,7 @@ class NoteGalleryView extends ItemView {
       }
 
       for (const file of files) {
+        if (this._listRenderGen !== gen) return;
         await this.renderNoteCard(listContainer, file, filesFolder, dateLocale, titleWrap, thumbnailSize);
       }
 
@@ -1116,6 +1119,7 @@ class NoteGalleryView extends ItemView {
     }
 
     for (const file of files) {
+      if (this._listRenderGen !== gen) return;
       if (file.extension === "md") {
         await this.renderNoteCard(listContainer, file, filesFolder, dateLocale, titleWrap, thumbnailSize);
       } else {
