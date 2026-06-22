@@ -1752,38 +1752,38 @@ export default class NoteGalleryPlugin extends Plugin {
       if (this.settings.openOnStartup) {
         this.activateView();
       }
-    });
 
-    const sInit = STRINGS[this.settings.language];
-    this.addRibbonIcon("layout-grid", sInit.openGallery, async () => {
-      await this.openGallery(this.app.vault.getRoot());
-    });
-
-    this.addCommand({
-      id: "open-note-gallery",
-      name: sInit.openGallery,
-      callback: async () => {
+      const sInit = STRINGS[this.settings.language];
+      this.addRibbonIcon("layout-grid", sInit.openGallery, async () => {
         await this.openGallery(this.app.vault.getRoot());
-      },
-    });
+      });
 
-    this.registerEvent(
-      this.app.workspace.on("file-menu", (menu, file) => {
-        if (file instanceof TFolder) {
-          menu.addItem((item) => {
-            item.setTitle(STRINGS[this.settings.language].openAsGallery).setIcon("layout-grid")
-              .onClick(async () => {
-                const leaf = this.app.workspace.getLeaf(true);
-                await leaf.setViewState({
-                  type: VIEW_TYPE,
-                  active: true,
-                  state: { folderPath: file.path },
+      this.addCommand({
+        id: "open-note-gallery",
+        name: sInit.openGallery,
+        callback: async () => {
+          await this.openGallery(this.app.vault.getRoot());
+        },
+      });
+
+      this.registerEvent(
+        this.app.workspace.on("file-menu", (menu, file) => {
+          if (file instanceof TFolder) {
+            menu.addItem((item) => {
+              item.setTitle(STRINGS[this.settings.language].openAsGallery).setIcon("layout-grid")
+                .onClick(async () => {
+                  const leaf = this.app.workspace.getLeaf(true);
+                  await leaf.setViewState({
+                    type: VIEW_TYPE,
+                    active: true,
+                    state: { folderPath: file.path },
+                  });
                 });
-              });
-          });
-        }
-      })
-    );
+            });
+          }
+        })
+      );
+    });
 
   }
 
