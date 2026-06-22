@@ -8,4 +8,5 @@ esbuild.build({
   outfile: "main.js",
   platform: "browser",
   target: "ES6",
+  minify: true,
 }).catch(() => process.exit(1));
