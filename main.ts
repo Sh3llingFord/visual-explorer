@@ -40,6 +40,7 @@ interface NoteGallerySettings {
   menuShowNewDoc: boolean;
   menuShowCreateFolder: boolean;
   menuShowOpenSettings: boolean;
+  archiveFolder: string;
 }
 
 const DEFAULT_SETTINGS: NoteGallerySettings = {
@@ -66,6 +67,7 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   menuShowNewDoc: true,
   menuShowCreateFolder: true,
   menuShowOpenSettings: true,
+  archiveFolder: "Archiv",
 };
 
 const STRINGS = {
@@ -152,6 +154,11 @@ const STRINGS = {
     moveNoteTitle: "Notiz verschieben",
     moveNoteSearch: "Ordner suchen…",
     moved: (name: string, folder: string) => `"${name}" verschoben nach ${folder}`,
+    archive: "Archivieren",
+    archived: (name: string, folder: string) => `"${name}" archiviert in ${folder}`,
+    archiveFolderNotSet: "Kein Archiv-Ordner konfiguriert. Bitte in den Einstellungen festlegen.",
+    stArchiveFolder: "Archiv-Ordner",
+    stArchiveFolderDesc: "Pfad des Ordners, in den Notizen per Kontextmenü archiviert werden (relativ zum Vault-Root)",
   },
   en: {
     search: "Search…",
@@ -236,6 +243,11 @@ const STRINGS = {
     moveNoteTitle: "Move note",
     moveNoteSearch: "Search folders…",
     moved: (name: string, folder: string) => `"${name}" moved to ${folder}`,
+    archive: "Archive",
+    archived: (name: string, folder: string) => `"${name}" archived to ${folder}`,
+    archiveFolderNotSet: "No archive folder configured. Please set one in the plugin settings.",
+    stArchiveFolder: "Archive folder",
+    stArchiveFolderDesc: "Path of the folder notes are moved to when archived via the context menu (relative to vault root)",
   },
 };
 
@@ -1260,6 +1272,24 @@ class NoteGalleryView extends ItemView {
           }
         },
         {
+          label: s.archive,
+          icon: "archive",
+          action: async () => {
+            const archivePath = this.plugin.settings.archiveFolder.trim();
+            if (!archivePath) {
+              new Notice(s.archiveFolderNotSet);
+              return;
+            }
+            if (!this.app.vault.getAbstractFileByPath(archivePath)) {
+              await this.app.vault.createFolder(archivePath);
+            }
+            const newPath = archivePath + "/" + file.name;
+            await this.app.fileManager.renameFile(file, newPath);
+            new Notice(s.archived(file.basename, archivePath));
+            await this.render();
+          }
+        },
+        {
           label: s.delete,
           icon: "trash",
           danger: true,
@@ -1545,6 +1575,14 @@ class NoteGallerySettingTab extends PluginSettingTab {
       .addText(text =>
         text.setPlaceholder("Files").setValue(this.plugin.settings.filesFolder)
           .onChange(async (value) => { this.plugin.settings.filesFolder = value.trim(); await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stArchiveFolder)
+      .setDesc(s.stArchiveFolderDesc)
+      .addText(text =>
+        text.setPlaceholder("Archiv").setValue(this.plugin.settings.archiveFolder)
+          .onChange(async (value) => { this.plugin.settings.archiveFolder = value.trim(); await this.plugin.saveSettings(); })
       );
 
     // ── Sortierung & Ansichten / Sorting & Views ──────────────────
