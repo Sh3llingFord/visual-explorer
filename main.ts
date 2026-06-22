@@ -1053,6 +1053,24 @@ class NoteGalleryView extends ItemView {
             }
           },
           {
+            label: s.archive,
+            icon: "archive",
+            action: async () => {
+              const archivePath = this.plugin.settings.archiveFolder.trim();
+              if (!archivePath) {
+                new Notice(s.archiveFolderNotSet);
+                return;
+              }
+              if (!this.app.vault.getAbstractFileByPath(archivePath)) {
+                await this.app.vault.createFolder(archivePath);
+              }
+              const newPath = archivePath + "/" + subfolder.name;
+              await this.app.fileManager.renameFile(subfolder, newPath);
+              new Notice(s.archived(subfolder.name, archivePath));
+              await this.render();
+            }
+          },
+          {
             label: s.deleteFolder,
             icon: "trash",
             danger: true,
