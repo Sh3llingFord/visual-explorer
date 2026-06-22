@@ -10,6 +10,7 @@ import {
   Modal,
   Notice,
   Menu,
+  AbstractInputSuggest,
 } from "obsidian";
 
 const VIEW_TYPE = "visual-explorer";
@@ -1476,6 +1477,35 @@ class NoteGalleryView extends ItemView {
   }
 }
 
+// ── Folder Suggest ────────────────────────────────────────────────────────────
+
+class FolderSuggest extends AbstractInputSuggest<TFolder> {
+  private onSelectCb: (folder: TFolder) => void;
+
+  constructor(app: App, inputEl: HTMLInputElement, onSelect: (folder: TFolder) => void) {
+    super(app, inputEl);
+    this.onSelectCb = onSelect;
+  }
+
+  getSuggestions(query: string): TFolder[] {
+    const q = query.toLowerCase();
+    return this.app.vault.getAllLoadedFiles()
+      .filter((f): f is TFolder => f instanceof TFolder && f.path.toLowerCase().includes(q))
+      .sort((a, b) => a.path.localeCompare(b.path))
+      .slice(0, 50);
+  }
+
+  renderSuggestion(folder: TFolder, el: HTMLElement): void {
+    el.setText(folder.path || "/");
+  }
+
+  selectSuggestion(folder: TFolder): void {
+    this.setValue(folder.path);
+    this.onSelectCb(folder);
+    this.close();
+  }
+}
+
 // ── Settings Tab ─────────────────────────────────────────────────────────────
 
 class NoteGallerySettingTab extends PluginSettingTab {
@@ -1572,18 +1602,26 @@ class NoteGallerySettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName(s.stFilesFolder)
       .setDesc(s.stFilesFolderDesc)
-      .addText(text =>
+      .addText(text => {
+        new FolderSuggest(this.app, text.inputEl, async (folder) => {
+          this.plugin.settings.filesFolder = folder.path;
+          await this.plugin.saveSettings();
+        });
         text.setPlaceholder("Files").setValue(this.plugin.settings.filesFolder)
-          .onChange(async (value) => { this.plugin.settings.filesFolder = value.trim(); await this.plugin.saveSettings(); })
-      );
+          .onChange(async (value) => { this.plugin.settings.filesFolder = value.trim(); await this.plugin.saveSettings(); });
+      });
 
     new Setting(containerEl)
       .setName(s.stArchiveFolder)
       .setDesc(s.stArchiveFolderDesc)
-      .addText(text =>
+      .addText(text => {
+        new FolderSuggest(this.app, text.inputEl, async (folder) => {
+          this.plugin.settings.archiveFolder = folder.path;
+          await this.plugin.saveSettings();
+        });
         text.setPlaceholder("Archiv").setValue(this.plugin.settings.archiveFolder)
-          .onChange(async (value) => { this.plugin.settings.archiveFolder = value.trim(); await this.plugin.saveSettings(); })
-      );
+          .onChange(async (value) => { this.plugin.settings.archiveFolder = value.trim(); await this.plugin.saveSettings(); });
+      });
 
     // ── Sortierung & Ansichten / Sorting & Views ──────────────────
     containerEl.createEl("h3", { text: s.stSectionSort, cls: "note-gallery-settings-section" });
