@@ -82,6 +82,27 @@
   padding: 0;
 }
 .note-gallery-new-btn:hover { background: var(--interactive-accent-hover); }
+.note-gallery-search-scope {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.note-gallery-search-scope:hover { color: var(--text-normal); }
+.note-gallery-search-scope.is-active {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: white;
+}
+.note-gallery-search-scope .svg-icon { width: 16px; height: 16px; }
 .note-gallery-counter {
   font-size: 11px;
   color: var(--text-faint);
