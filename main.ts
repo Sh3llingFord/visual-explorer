@@ -11,6 +11,8 @@ import {
   Notice,
   Menu,
   AbstractInputSuggest,
+  debounce,
+  setIcon,
 } from "obsidian";
 
 const VIEW_TYPE = "visual-explorer";
@@ -42,6 +44,8 @@ interface NoteGallerySettings {
   menuShowCreateFolder: boolean;
   menuShowOpenSettings: boolean;
   archiveFolder: string;
+  coverMode: "off" | "tag" | "always";
+  coverTag: string;
 }
 
 const DEFAULT_SETTINGS: NoteGallerySettings = {
@@ -69,6 +73,8 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   menuShowCreateFolder: true,
   menuShowOpenSettings: true,
   archiveFolder: "Archiv",
+  coverMode: "tag",
+  coverTag: "vec",
 };
 
 const STRINGS = {
@@ -160,6 +166,15 @@ const STRINGS = {
     archiveFolderNotSet: "Kein Archiv-Ordner konfiguriert. Bitte in den Einstellungen festlegen.",
     stArchiveFolder: "Archiv-Ordner",
     stArchiveFolderDesc: "Pfad des Ordners, in den Notizen per Kontextmenü archiviert werden (relativ zum Vault-Root)",
+    stCoverMode: "Cover-Layout",
+    stCoverModeDesc: "Großes Titelbild statt kleinem Thumbnail",
+    stCoverModeOff: "Aus",
+    stCoverModeTag: "Per Tag",
+    stCoverModeAlways: "Immer",
+    stCoverTag: "Cover-Tag",
+    stCoverTagDesc: "Notizen mit diesem Tag erhalten das Cover-Layout (nur bei \"Per Tag\")",
+    searchVaultTooltip: "Im ganzen Vault suchen",
+    searchFolderTooltip: "Nur im aktuellen Ordner suchen",
   },
   en: {
     search: "Search…",
@@ -249,6 +264,15 @@ const STRINGS = {
     archiveFolderNotSet: "No archive folder configured. Please set one in the plugin settings.",
     stArchiveFolder: "Archive folder",
     stArchiveFolderDesc: "Path of the folder notes are moved to when archived via the context menu (relative to vault root)",
+    stCoverMode: "Cover layout",
+    stCoverModeDesc: "Large cover image instead of a small thumbnail",
+    stCoverModeOff: "Off",
+    stCoverModeTag: "By tag",
+    stCoverModeAlways: "Always",
+    stCoverTag: "Cover tag",
+    stCoverTagDesc: "Notes with this tag use the cover layout (only with \"By tag\")",
+    searchVaultTooltip: "Search the whole vault",
+    searchFolderTooltip: "Search the current folder only",
   },
 };
 
@@ -603,6 +627,7 @@ class NoteGalleryView extends ItemView {
   private plugin: NoteGalleryPlugin;
   private folderPath: string = "";
   private searchQuery: string = "";
+  private searchVaultWide: boolean = false;
   private breadcrumb: TFolder[] = [];
   private mode: "folder" | "recent" | "favorites" = "folder";
   private currentSort: string = "modified-desc";
@@ -816,11 +841,31 @@ class NoteGalleryView extends ItemView {
     clearBtn.setText("✕");
     clearBtn.style.display = this.searchQuery ? "flex" : "none";
 
-    searchInput.addEventListener("input", async () => {
+    const debouncedSearchRender = debounce(() => {
+      const lc = container.querySelector(".note-gallery-list") as HTMLElement;
+      if (lc) this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+    }, 150);
+
+    // Search scope toggle: current folder ↔ whole vault
+    const scopeBtn = controls.createDiv({ cls: "note-gallery-search-scope" });
+    const updateScopeBtn = () => {
+      setIcon(scopeBtn, this.searchVaultWide ? "globe" : "folder");
+      scopeBtn.toggleClass("is-active", this.searchVaultWide);
+      scopeBtn.setAttribute("aria-label", this.searchVaultWide ? s.searchVaultTooltip : s.searchFolderTooltip);
+      scopeBtn.title = this.searchVaultWide ? s.searchVaultTooltip : s.searchFolderTooltip;
+    };
+    updateScopeBtn();
+    scopeBtn.addEventListener("click", () => {
+      this.searchVaultWide = !this.searchVaultWide;
+      updateScopeBtn();
+      const lc = container.querySelector(".note-gallery-list") as HTMLElement;
+      if (lc) this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+    });
+
+    searchInput.addEventListener("input", () => {
       this.searchQuery = searchInput.value;
       clearBtn.style.display = this.searchQuery ? "flex" : "none";
-      const lc = container.querySelector(".note-gallery-list") as HTMLElement;
-      if (lc) await this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+      debouncedSearchRender();
     });
 
     searchInput.addEventListener("keydown", async (e: KeyboardEvent) => {
@@ -1101,7 +1146,9 @@ class NoteGalleryView extends ItemView {
     }
 
     const filePool = q
-      ? this.collectFilesRecursively(this.folder)
+      ? (this.searchVaultWide
+          ? this.app.vault.getFiles().filter(f => f.extension === "md" || IMAGE_EXTS.has(f.extension.toLowerCase()))
+          : this.collectFilesRecursively(this.folder))
       : this.folder.children.filter((f): f is TFile => f instanceof TFile);
 
     let files = filePool.filter(f => {
@@ -1171,7 +1218,7 @@ class NoteGalleryView extends ItemView {
   ) {
     const { language, showPreview, previewLines } = this.plugin.settings;
     const s = STRINGS[language];
-    const content = await this.app.vault.read(file);
+    const content = await this.app.vault.cachedRead(file);
     const cache = this.app.metadataCache.getFileCache(file);
     const frontmatter = (cache?.frontmatter ?? {}) as Record<string, unknown>;
 
@@ -1180,8 +1227,11 @@ class NoteGalleryView extends ItemView {
     const category = extractCategories(frontmatter);
     const dateStr = formatDate(frontmatter, file, dateLocale);
     const favorite = isFavorite(frontmatter);
+    const { coverMode, coverTag } = this.plugin.settings;
     const coverTags: string[] = Array.isArray(frontmatter?.tags) ? (frontmatter.tags as unknown[]).map(String) : [];
-    const isCoverMode = coverTags.includes("vec");
+    const isCoverMode =
+      coverMode === "always" ||
+      (coverMode === "tag" && coverTag.trim() !== "" && coverTags.includes(coverTag.trim()));
 
     const card = listContainer.createDiv({ cls: "note-gallery-card" });
     if (isCoverMode) card.addClass("note-gallery-card--cover");
@@ -1222,6 +1272,8 @@ class NoteGalleryView extends ItemView {
         if (isCoverMode) {
           const coverDiv = card.createDiv({ cls: "note-gallery-cover-img" });
           const img = coverDiv.createEl("img");
+          img.loading = "lazy";
+          img.decoding = "async";
           img.src = url;
           img.alt = file.basename;
         } else {
@@ -1229,6 +1281,8 @@ class NoteGalleryView extends ItemView {
           imgDiv.style.width = thumbnailSize + "px";
           imgDiv.style.height = thumbnailSize + "px";
           const img = imgDiv.createEl("img");
+          img.loading = "lazy";
+          img.decoding = "async";
           img.src = url;
           img.alt = file.basename;
         }
@@ -1381,6 +1435,8 @@ class NoteGalleryView extends ItemView {
       imgDiv.style.height = thumbnailSize + "px";
       const url = this.app.vault.getResourcePath(file);
       const img = imgDiv.createEl("img");
+      img.loading = "lazy";
+      img.decoding = "async";
       img.src = url;
       img.alt = file.name;
     }
@@ -1616,6 +1672,27 @@ class NoteGallerySettingTab extends PluginSettingTab {
         slider.setLimits(40, 160, 8).setValue(this.plugin.settings.thumbnailSize).setDynamicTooltip()
           .onChange(async (value) => { this.plugin.settings.thumbnailSize = value; await this.plugin.saveSettings(); })
       );
+
+    new Setting(containerEl)
+      .setName(s.stCoverMode)
+      .setDesc(s.stCoverModeDesc)
+      .addDropdown(drop =>
+        drop.addOption("off", s.stCoverModeOff)
+          .addOption("tag", s.stCoverModeTag)
+          .addOption("always", s.stCoverModeAlways)
+          .setValue(this.plugin.settings.coverMode)
+          .onChange(async (value) => { this.plugin.settings.coverMode = value as NoteGallerySettings["coverMode"]; await this.plugin.saveSettings(); this.display(); })
+      );
+
+    if (this.plugin.settings.coverMode === "tag") {
+      new Setting(containerEl)
+        .setName(s.stCoverTag)
+        .setDesc(s.stCoverTagDesc)
+        .addText(text =>
+          text.setPlaceholder("vec").setValue(this.plugin.settings.coverTag)
+            .onChange(async (value) => { this.plugin.settings.coverTag = value.trim(); await this.plugin.saveSettings(); })
+        );
+    }
 
     new Setting(containerEl)
       .setName(s.stFilesFolder)
