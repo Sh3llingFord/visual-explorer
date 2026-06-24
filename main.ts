@@ -849,7 +849,8 @@ class NoteGalleryView extends ItemView {
 
     // Search scope toggle: current folder ↔ whole vault
     // At root, always vault-wide (globe, non-interactive); elsewhere toggleable.
-    const isAtRoot = this.folder.path === "";
+    // Use parent == null to detect root reliably (path can vary across Obsidian versions).
+    const isAtRoot = this.folder.parent == null;
     const scopeBtn = controls.createDiv({ cls: "note-gallery-search-scope" });
     if (isAtRoot) {
       setIcon(scopeBtn, "globe");
@@ -1156,7 +1157,7 @@ class NoteGalleryView extends ItemView {
     }
 
     const filePool = q
-      ? (this.searchVaultWide || this.folder.path === ""
+      ? (this.searchVaultWide || this.folder.parent == null
           ? this.app.vault.getFiles().filter(f => f.extension === "md" || IMAGE_EXTS.has(f.extension.toLowerCase()))
           : this.collectFilesRecursively(this.folder))
       : this.folder.children.filter((f): f is TFile => f instanceof TFile);
