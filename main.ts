@@ -847,11 +847,15 @@ class NoteGalleryView extends ItemView {
       if (lc) this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
     }, 150);
 
-    // Search scope toggle: current folder ↔ whole vault (hidden at root, where both are identical)
+    // Search scope toggle: current folder ↔ whole vault
+    // At root, always vault-wide (globe, non-interactive); elsewhere toggleable.
     const isAtRoot = this.folder.path === "";
     const scopeBtn = controls.createDiv({ cls: "note-gallery-search-scope" });
     if (isAtRoot) {
-      scopeBtn.style.display = "none";
+      setIcon(scopeBtn, "globe");
+      scopeBtn.toggleClass("is-active", true);
+      scopeBtn.setAttribute("aria-label", s.searchVaultTooltip);
+      scopeBtn.title = s.searchVaultTooltip;
     } else {
       const updateScopeBtn = () => {
         setIcon(scopeBtn, this.searchVaultWide ? "globe" : "folder");
@@ -1152,7 +1156,7 @@ class NoteGalleryView extends ItemView {
     }
 
     const filePool = q
-      ? (this.searchVaultWide
+      ? (this.searchVaultWide || this.folder.path === ""
           ? this.app.vault.getFiles().filter(f => f.extension === "md" || IMAGE_EXTS.has(f.extension.toLowerCase()))
           : this.collectFilesRecursively(this.folder))
       : this.folder.children.filter((f): f is TFile => f instanceof TFile);
