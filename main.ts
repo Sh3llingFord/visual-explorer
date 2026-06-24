@@ -662,6 +662,7 @@ class NoteGalleryView extends ItemView {
     }
     this.mode = "folder";
     this.searchQuery = "";
+    this.searchVaultWide = false;
     this.load();
     await this.render();
     await super.setState(state, result);
@@ -846,21 +847,26 @@ class NoteGalleryView extends ItemView {
       if (lc) this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
     }, 150);
 
-    // Search scope toggle: current folder ↔ whole vault
+    // Search scope toggle: current folder ↔ whole vault (hidden at root, where both are identical)
+    const isAtRoot = this.folder.path === "";
     const scopeBtn = controls.createDiv({ cls: "note-gallery-search-scope" });
-    const updateScopeBtn = () => {
-      setIcon(scopeBtn, this.searchVaultWide ? "globe" : "folder");
-      scopeBtn.toggleClass("is-active", this.searchVaultWide);
-      scopeBtn.setAttribute("aria-label", this.searchVaultWide ? s.searchVaultTooltip : s.searchFolderTooltip);
-      scopeBtn.title = this.searchVaultWide ? s.searchVaultTooltip : s.searchFolderTooltip;
-    };
-    updateScopeBtn();
-    scopeBtn.addEventListener("click", () => {
-      this.searchVaultWide = !this.searchVaultWide;
+    if (isAtRoot) {
+      scopeBtn.style.display = "none";
+    } else {
+      const updateScopeBtn = () => {
+        setIcon(scopeBtn, this.searchVaultWide ? "globe" : "folder");
+        scopeBtn.toggleClass("is-active", this.searchVaultWide);
+        scopeBtn.setAttribute("aria-label", this.searchVaultWide ? s.searchVaultTooltip : s.searchFolderTooltip);
+        scopeBtn.title = this.searchVaultWide ? s.searchVaultTooltip : s.searchFolderTooltip;
+      };
       updateScopeBtn();
-      const lc = container.querySelector(".note-gallery-list") as HTMLElement;
-      if (lc) this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
-    });
+      scopeBtn.addEventListener("click", () => {
+        this.searchVaultWide = !this.searchVaultWide;
+        updateScopeBtn();
+        const lc = container.querySelector(".note-gallery-list") as HTMLElement;
+        if (lc) this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+      });
+    }
 
     searchInput.addEventListener("input", () => {
       this.searchQuery = searchInput.value;
