@@ -5,10 +5,13 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
 ## Features
 
 - **Card view** — each note shows title, category, date, image thumbnail, and optional text preview
+- **Cover layout** — notes can display a large cover image instead of a small thumbnail (always, or per tag)
 - **Folder navigation** — subfolders always appear at the top as clickable entries with a breadcrumb trail
 - **Live search** — filter notes and folders by title or tag instantly
+- **Search scope toggle** — switch between searching only the current folder or the entire vault; at vault root the scope is always vault-wide
+- **Tag chips** — clickable tag filters appear below the search bar when tags are present in the current view
 - **+ button → action menu:**
-  - **Sort** — choose from 6 sort options with the active one highlighted (see below)
+  - **Sort** — choose from sort options with the active one highlighted (see below)
   - Favorites — shows all notes with `favorite: true` in frontmatter
   - Recently opened — shows the last N modified notes across the vault
   - New document — create a note directly in the current folder
@@ -17,12 +20,20 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
   - Modified (newest → oldest / oldest → newest)
   - Created (newest → oldest / oldest → newest) — respects `date`/`created` frontmatter
   - Name (A → Z / Z → A) — applies to both notes and subfolders
+  - Title date (newest → oldest / oldest → newest) — parses a date at the start of the filename
 - **Long-press (mobile) / right-click (desktop) → context menu on notes:**
   - Add / remove favorite
   - Rename
   - Move to folder — pick any vault folder from a searchable list
+  - Archive — move note to the configured archive folder
   - Open in new tab
   - Delete (with confirmation)
+- **Long-press (mobile) / right-click (desktop) → context menu on folders:**
+  - New note here
+  - Rename folder
+  - Archive folder
+  - Open in new tab
+  - Delete folder (with confirmation)
 - **Favorites** — marked with ★ in the list, stored as `favorite: true` in frontmatter (usable by other plugins like Dataview)
 - **Note counter** — shows number of notes and subfolders in the toolbar
 - **Auto-refresh** — gallery updates automatically when notes are added, modified, or deleted
@@ -59,6 +70,19 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
 - **Breadcrumb** at the top left shows the current path — click any segment to go back
 - **Search field** filters notes and folders live by title or tag
 
+### Search scope toggle
+Next to the search field is a scope button:
+
+| Icon | State | Behaviour |
+|---|---|---|
+| Folder | Folder scope | Only searches notes in the current folder (recursively) |
+| Globe | Vault-wide | Searches all notes across the entire vault |
+
+At vault root the button always shows the globe icon — the scope is vault-wide there by default and cannot be changed (root already covers the whole vault).
+
+### Tag chips
+When notes in the current view have `tags` or `categories` in their frontmatter, clickable tag chips appear below the search bar. Clicking a chip sets it as the search query; clicking again clears it.
+
 ### Sorting
 Tap the **+** button and select a sort option at the top of the menu. The active sort is marked with a checkmark. Sort state is per view session; the default is set in plugin settings.
 
@@ -70,6 +94,15 @@ Tap the **+** button and select a sort option at the top of the menu. The active
 | Created (oldest first) | |
 | Name (A–Z) | Alphabetical — applies to subfolders too |
 | Name (Z–A) | |
+| Title date (newest first) | Parses a date at the start of the filename (configurable format) |
+| Title date (oldest first) | |
+
+### Cover layout
+Notes can be displayed with a large cover image spanning the full card width instead of a small thumbnail. This is configured via **Settings → Cover layout**:
+
+- **Off** — standard thumbnail layout for all notes
+- **By tag** — only notes with the configured cover tag use the cover layout
+- **Always** — all notes with an image use the cover layout
 
 ### Actions via + button
 - **Favorites** — shows all favorited notes
@@ -81,24 +114,41 @@ Tap the **+** button and select a sort option at the top of the menu. The active
 - **Add / remove favorite** — sets `favorite: true` in frontmatter
 - **Rename** — rename the file
 - **Move to folder** — opens a searchable folder picker to move the note
+- **Archive** — moves the note to the configured archive folder
 - **Open in new tab** — opens the note in a new Obsidian tab
 - **Delete** — moves the note to trash
+
+### Actions via long-press / right-click on a folder
+- **New note here** — creates a note directly inside that folder
+- **Rename** — rename the folder
+- **Archive** — moves the folder to the configured archive folder
+- **Open in new tab** — opens the folder in a new Visual Explorer tab
+- **Delete** — moves the folder and all its contents to trash
 
 ## Settings
 
 | Setting | Default | Description |
 |---|---|---|
-| Thumbnail size | 72px | Width and height of the image preview (40–160px) |
-| Files folder | `Files` | Path to the folder containing images, relative to vault root |
-| Default sort | Modified (newest first) | Default sort for new views |
-| Date format | de-DE | de-DE / en-US / en-GB |
-| Wrap title | Off | Allow long titles to wrap instead of being truncated |
 | Language | German | German / English |
-| Recent count | 30 | How many notes to show in "Recently opened" (5–100) |
+| Date format | de-DE | de-DE / en-US / en-GB |
+| Open on startup | Off | Automatically open Visual Explorer when Obsidian starts |
 | Show preview | On | Show the first lines of note content |
 | Preview lines | 1 | Number of preview text lines (1 or 2) |
 | Favorites first | Off | Show favorited notes at the top of the folder view |
+| Wrap title | Off | Allow long titles to wrap instead of being truncated |
+| Thumbnail size | 72px | Width and height of the image preview (40–160px) |
+| Cover layout | By tag | Off / By tag / Always |
+| Cover tag | `vec` | Tag that triggers the cover layout (only relevant for "By tag") |
+| Files folder | `Files` | Path to the folder containing images, relative to vault root |
+| Archive folder | `Archiv` | Destination folder for the Archive action, relative to vault root |
+| Default sort | Modified (newest first) | Default sort for new views |
+| Title date format | dd.mm.yyyy | Date format parsed from the start of filenames for "Title date" sort |
+| Recent count | 30 | How many notes to show in "Recently opened" (5–100) |
 | Breadcrumb font size | 12px | Font size of the breadcrumb path (10–18px) |
+
+### Menu content
+Each entry in the **+** menu can be individually shown or hidden in settings:
+Sort (Modified / Created / Name / Title date / Reset), Favorites, Recently opened, New document, Create folder, Open settings.
 
 ## Image support
 
@@ -121,12 +171,14 @@ date: 2024-10-13 14:57:15
 created: 2024-10-13 14:57:07
 categories:
   - Photography
+tags:
+  - journal
 favorite: true
 ---
 ```
 
 - `date` or `created` → displayed as the note date, and used for "Created" sort ordering
-- `categories` or `tags` → first value displayed as `#category`
+- `categories` or `tags` → first value displayed as `#category`; both are also used for tag chips and search filtering
 - `favorite: true` → note is marked with ★ and appears in the Favorites view (also usable by Dataview and other plugins)
 
 ## Building from source
