@@ -1154,6 +1154,29 @@ class NoteGalleryView extends ItemView {
       card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
       card.addEventListener("touchcancel", () => clearTimeout(longPressTimer));
       card.addEventListener("click", () => this.navigateTo(subfolder));
+
+      // Drop target: accept dragged notes/files
+      card.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        card.addClass("note-gallery-card--drag-over");
+      });
+      card.addEventListener("dragleave", (e) => {
+        if (!card.contains(e.relatedTarget as Node)) {
+          card.removeClass("note-gallery-card--drag-over");
+        }
+      });
+      card.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        card.removeClass("note-gallery-card--drag-over");
+        const filePath = e.dataTransfer?.getData("text/plain");
+        if (!filePath) return;
+        const draggedFile = this.app.vault.getAbstractFileByPath(filePath);
+        if (!(draggedFile instanceof TFile)) return;
+        const newPath = (subfolder.path ? subfolder.path + "/" : "") + draggedFile.name;
+        await this.app.fileManager.renameFile(draggedFile, newPath);
+        new Notice(s.moved(draggedFile.basename, subfolder.path || "/"));
+        await this.render();
+      });
     }
 
     const filePool = q
@@ -1246,6 +1269,16 @@ class NoteGalleryView extends ItemView {
 
     const card = listContainer.createDiv({ cls: "note-gallery-card" });
     if (isCoverMode) card.addClass("note-gallery-card--cover");
+
+    // Drag: allow note to be dragged onto a folder card
+    card.draggable = true;
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer?.setData("text/plain", file.path);
+      card.addClass("note-gallery-card--dragging");
+    });
+    card.addEventListener("dragend", () => {
+      card.removeClass("note-gallery-card--dragging");
+    });
 
     // Left: text
     const textDiv = card.createDiv({ cls: "note-gallery-text" });
@@ -1430,6 +1463,16 @@ class NoteGalleryView extends ItemView {
     });
 
     const card = listContainer.createDiv({ cls: "note-gallery-card" });
+
+    // Drag: allow file to be dragged onto a folder card
+    card.draggable = true;
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer?.setData("text/plain", file.path);
+      card.addClass("note-gallery-card--dragging");
+    });
+    card.addEventListener("dragend", () => {
+      card.removeClass("note-gallery-card--dragging");
+    });
 
     const textDiv = card.createDiv({ cls: "note-gallery-text" });
     const titleRow = textDiv.createDiv({ cls: "note-gallery-title-row" });
