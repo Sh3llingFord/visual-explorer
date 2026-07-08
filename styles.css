@@ -230,50 +230,83 @@
   object-fit: cover;
 }
 
-/* ── Grid view ── */
+/* ── Grid view ──
+   The tile itself is the square via padding-bottom on the grid item —
+   the one square-tile pattern grid row sizing gets right everywhere
+   (aspect-ratio / percentage padding on descendants collapses rows on
+   iOS WebKit). Image fills the tile, text overlays a bottom scrim. */
 .note-gallery-list--grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
   align-content: start;
   padding: 10px;
 }
 .note-gallery-list--grid .note-gallery-list-spacer { grid-column: 1 / -1; }
 .note-gallery-card--grid {
-  flex-direction: column;
-  align-items: stretch;
-  padding: 0;
+  display: block;
+  position: relative;
+  height: 0;
+  padding: 0 0 100% 0;
   margin-bottom: 0;
-  gap: 0;
   overflow: hidden;
-  contain-intrinsic-size: auto 210px;
+  content-visibility: visible;
+  contain-intrinsic-size: unset;
 }
 .note-gallery-grid-media {
-  aspect-ratio: 16 / 10;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background: var(--background-modifier-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   color: var(--text-faint);
-  overflow: hidden;
-  flex-shrink: 0;
 }
 .note-gallery-grid-media img {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.note-gallery-grid-media .svg-icon { width: 32px; height: 32px; }
+.note-gallery-grid-media .svg-icon {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+}
 .note-gallery-grid-media--folder { color: var(--text-accent); }
-.note-gallery-card--grid .note-gallery-text { padding: 8px 10px 10px; }
+.note-gallery-card--grid .note-gallery-text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20px 10px 8px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
+}
 .note-gallery-card--grid .note-gallery-title {
-  font-size: 13.5px;
+  color: #ffffff;
+  font-size: 13px;
   white-space: normal;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: unset;
+}
+.note-gallery-card--grid .note-gallery-favorite-star { color: #ffd166; }
+.note-gallery-card--grid .note-gallery-meta,
+.note-gallery-card--grid .note-gallery-meta .note-gallery-category,
+.note-gallery-card--grid .note-gallery-meta-sep,
+.note-gallery-card--grid .note-gallery-date {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .note-gallery-modal-buttons {
