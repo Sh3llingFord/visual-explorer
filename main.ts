@@ -46,6 +46,7 @@ interface NoteGallerySettings {
   archiveFolder: string;
   coverMode: "off" | "tag" | "always";
   coverTag: string;
+  viewMode: "list" | "grid";
 }
 
 const DEFAULT_SETTINGS: NoteGallerySettings = {
@@ -75,6 +76,7 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   archiveFolder: "Archiv",
   coverMode: "tag",
   coverTag: "vec",
+  viewMode: "list",
 };
 
 const STRINGS = {
@@ -175,6 +177,8 @@ const STRINGS = {
     stCoverTagDesc: "Notizen mit diesem Tag erhalten das Cover-Layout (nur bei \"Per Tag\")",
     searchVaultTooltip: "Im ganzen Vault suchen",
     searchFolderTooltip: "Nur im aktuellen Ordner suchen",
+    viewAsList: "Als Liste anzeigen",
+    viewAsGrid: "Als Raster anzeigen",
   },
   en: {
     search: "Search…",
@@ -273,6 +277,8 @@ const STRINGS = {
     stCoverTagDesc: "Notes with this tag use the cover layout (only with \"By tag\")",
     searchVaultTooltip: "Search the whole vault",
     searchFolderTooltip: "Search the current folder only",
+    viewAsList: "Show as list",
+    viewAsGrid: "Show as grid",
   },
 };
 
@@ -797,8 +803,9 @@ class NoteGalleryView extends ItemView {
   }
 
   private buildBreadcrumb(toolbar: HTMLElement, s: typeof STRINGS["de"], breadcrumbFontSize: number) {
+    const header = toolbar.createDiv({ cls: "note-gallery-header" });
     if (this.mode === "folder") {
-      const breadcrumbEl = toolbar.createDiv({ cls: "note-gallery-breadcrumb" });
+      const breadcrumbEl = header.createDiv({ cls: "note-gallery-breadcrumb" });
       breadcrumbEl.style.fontSize = breadcrumbFontSize + "px";
       this.breadcrumb.forEach((crumb, i) => {
         if (i > 0) breadcrumbEl.createSpan({ cls: "note-gallery-breadcrumb-sep", text: " / " });
@@ -809,7 +816,7 @@ class NoteGalleryView extends ItemView {
         }
       });
     } else {
-      const modeLabel = toolbar.createDiv({ cls: "note-gallery-breadcrumb" });
+      const modeLabel = header.createDiv({ cls: "note-gallery-breadcrumb" });
       modeLabel.style.fontSize = breadcrumbFontSize + "px";
       modeLabel.createSpan({ cls: "note-gallery-breadcrumb-link", text: s.back })
         .addEventListener("click", () => { this.mode = "folder"; this.render(); });
@@ -851,7 +858,7 @@ class NoteGalleryView extends ItemView {
     // At root, always vault-wide (globe, non-interactive); elsewhere toggleable.
     // Use parent == null to detect root reliably (path can vary across Obsidian versions).
     const isAtRoot = this.folder.parent == null;
-    const scopeBtn = controls.createDiv({ cls: "note-gallery-search-scope" });
+    const scopeBtn = controls.createDiv({ cls: "note-gallery-icon-btn note-gallery-search-scope" });
     if (isAtRoot) {
       setIcon(scopeBtn, "globe");
       scopeBtn.toggleClass("is-active", true);
@@ -897,17 +904,36 @@ class NoteGalleryView extends ItemView {
       searchInput.focus();
     });
 
+    const sortBtn = controls.createDiv({ cls: "note-gallery-icon-btn" });
+    setIcon(sortBtn, "arrow-up-down");
+    sortBtn.setAttribute("aria-label", s.sort);
+    sortBtn.title = s.sort;
+    sortBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const menu = new Menu();
+      this.addSortMenuItems(menu, container, filesFolder, dateLocale, titleWrap, thumbnailSize, false);
+      menu.showAtMouseEvent(e);
+    });
+
+    const viewBtn = controls.createDiv({ cls: "note-gallery-icon-btn" });
+    const updateViewBtn = () => {
+      const isGrid = this.plugin.settings.viewMode === "grid";
+      setIcon(viewBtn, isGrid ? "list" : "layout-grid");
+      viewBtn.setAttribute("aria-label", isGrid ? s.viewAsList : s.viewAsGrid);
+      viewBtn.title = isGrid ? s.viewAsList : s.viewAsGrid;
+    };
+    updateViewBtn();
+    viewBtn.addEventListener("click", async () => {
+      this.plugin.settings.viewMode = this.plugin.settings.viewMode === "grid" ? "list" : "grid";
+      await this.plugin.saveSettings();
+      await this.render();
+    });
+
     const newBtn = controls.createEl("button", { cls: "note-gallery-new-btn", text: "+" });
     newBtn.title = s.actions;
     newBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       const ms = this.plugin.settings;
-      const sortTypes: { show: boolean; label: string; asc: string; desc: string; defaultDir: "asc" | "desc" }[] = [
-        { show: ms.menuShowSortModified,  label: s.sortModified,  asc: "modified-asc",   desc: "modified-desc",   defaultDir: "desc" },
-        { show: ms.menuShowSortCreated,   label: s.sortCreated,   asc: "created-asc",    desc: "created-desc",    defaultDir: "desc" },
-        { show: ms.menuShowSortName,      label: s.sortName,      asc: "name-asc",       desc: "name-desc",       defaultDir: "asc" },
-        { show: ms.menuShowSortTitleDate, label: s.sortTitleDate, asc: "title-date-asc", desc: "title-date-desc", defaultDir: "desc" },
-      ].filter(t => t.show);
 
       const menu = new Menu();
       let hasItems = false;
@@ -917,35 +943,9 @@ class NoteGalleryView extends ItemView {
         hasItems = true;
       };
 
-      if (sortTypes.length || ms.menuShowSortNone) {
-        addGroup(() => {
-          for (const t of sortTypes) {
-            const isAsc = this.currentSort === t.asc;
-            const isDesc = this.currentSort === t.desc;
-            menu.addItem(item => {
-              item.setTitle(t.label);
-              item.setIcon(isAsc ? "arrow-up" : isDesc ? "arrow-down" : "arrow-up-down");
-              item.setChecked(isAsc || isDesc);
-              item.onClick(async () => {
-                this.currentSort = isAsc ? t.desc : isDesc ? t.asc : (t.defaultDir === "asc" ? t.asc : t.desc);
-                const lc = container.querySelector(".note-gallery-list") as HTMLElement;
-                if (lc) await this.renderList(lc, filesFolder, dateLocale, this.currentSort, titleWrap, thumbnailSize);
-              });
-            });
-          }
-          if (ms.menuShowSortNone) {
-            menu.addItem(item => {
-              item.setTitle(s.sortNone);
-              item.setIcon("rotate-ccw");
-              item.setChecked(this.currentSort === ms.sortBy);
-              item.onClick(async () => {
-                this.currentSort = ms.sortBy;
-                const lc = container.querySelector(".note-gallery-list") as HTMLElement;
-                if (lc) await this.renderList(lc, filesFolder, dateLocale, this.currentSort, titleWrap, thumbnailSize);
-              });
-            });
-          }
-        });
+      const anySortShown = ms.menuShowSortModified || ms.menuShowSortCreated || ms.menuShowSortName || ms.menuShowSortTitleDate;
+      if (anySortShown || ms.menuShowSortNone) {
+        addGroup(() => this.addSortMenuItems(menu, container, filesFolder, dateLocale, titleWrap, thumbnailSize, true));
       }
 
       const navBuilders: (() => void)[] = [];
@@ -991,6 +991,58 @@ class NoteGalleryView extends ItemView {
     });
   }
 
+  // Shared between the toolbar sort button (all options) and the "+" menu
+  // (filtered by the menuShow* settings).
+  private addSortMenuItems(
+    menu: Menu,
+    container: HTMLElement,
+    filesFolder: string,
+    dateLocale: string,
+    titleWrap: boolean,
+    thumbnailSize: number,
+    respectMenuSettings: boolean
+  ) {
+    const ms = this.plugin.settings;
+    const s = STRINGS[ms.language];
+    const allSortTypes: { show: boolean; label: string; asc: string; desc: string; defaultDir: "asc" | "desc" }[] = [
+      { show: ms.menuShowSortModified,  label: s.sortModified,  asc: "modified-asc",   desc: "modified-desc",   defaultDir: "desc" },
+      { show: ms.menuShowSortCreated,   label: s.sortCreated,   asc: "created-asc",    desc: "created-desc",    defaultDir: "desc" },
+      { show: ms.menuShowSortName,      label: s.sortName,      asc: "name-asc",       desc: "name-desc",       defaultDir: "asc" },
+      { show: ms.menuShowSortTitleDate, label: s.sortTitleDate, asc: "title-date-asc", desc: "title-date-desc", defaultDir: "desc" },
+    ];
+    const sortTypes = allSortTypes.filter(t => !respectMenuSettings || t.show);
+
+    const rerenderList = async () => {
+      const lc = container.querySelector(".note-gallery-list") as HTMLElement;
+      if (lc) await this.renderList(lc, filesFolder, dateLocale, this.currentSort, titleWrap, thumbnailSize);
+    };
+
+    for (const t of sortTypes) {
+      const isAsc = this.currentSort === t.asc;
+      const isDesc = this.currentSort === t.desc;
+      menu.addItem(item => {
+        item.setTitle(t.label);
+        item.setIcon(isAsc ? "arrow-up" : isDesc ? "arrow-down" : "arrow-up-down");
+        item.setChecked(isAsc || isDesc);
+        item.onClick(async () => {
+          this.currentSort = isAsc ? t.desc : isDesc ? t.asc : (t.defaultDir === "asc" ? t.asc : t.desc);
+          await rerenderList();
+        });
+      });
+    }
+    if (!respectMenuSettings || ms.menuShowSortNone) {
+      menu.addItem(item => {
+        item.setTitle(s.sortNone);
+        item.setIcon("rotate-ccw");
+        item.setChecked(this.currentSort === ms.sortBy);
+        item.onClick(async () => {
+          this.currentSort = ms.sortBy;
+          await rerenderList();
+        });
+      });
+    }
+  }
+
   private collectFilesRecursively(folder: TFolder): TFile[] {
     const result: TFile[] = [];
     for (const child of folder.children) {
@@ -1013,6 +1065,15 @@ class NoteGalleryView extends ItemView {
     const { language, recentCount, showPreview } = this.plugin.settings;
     const s = STRINGS[language];
     const q = this.searchQuery.toLowerCase();
+    const isGrid = this.plugin.settings.viewMode === "grid";
+    listContainer.toggleClass("note-gallery-list--grid", isGrid);
+
+    const setCounter = (text: string) => {
+      const existingCounter = this.containerEl.querySelector(".note-gallery-counter");
+      if (existingCounter) existingCounter.remove();
+      const header = this.containerEl.querySelector(".note-gallery-header") as HTMLElement;
+      if (header) header.createDiv({ cls: "note-gallery-counter", text });
+    };
 
     // ── Recent / Favorites mode ──────────────────────────────
     if (this.mode === "recent" || this.mode === "favorites") {
@@ -1037,14 +1098,7 @@ class NoteGalleryView extends ItemView {
         return tags.some(t => String(t).toLowerCase().includes(q));
       });
 
-      // Counter
-      const toolbar = this.containerEl.querySelector(".note-gallery-toolbar") as HTMLElement;
-      const existingCounter = toolbar?.querySelector(".note-gallery-counter");
-      if (existingCounter) existingCounter.remove();
-      if (toolbar) {
-        const counter = toolbar.createDiv({ cls: "note-gallery-counter" });
-        counter.setText(files.length + " " + s.notes);
-      }
+      setCounter(files.length + " " + s.notes);
 
       for (const file of files) {
         if (this._listRenderGen !== gen) return;
@@ -1065,8 +1119,14 @@ class NoteGalleryView extends ItemView {
 
     for (const subfolder of subfolders) {
       const card = listContainer.createDiv({ cls: "note-gallery-card note-gallery-folder-card" });
-      const chevron = card.createDiv({ cls: "note-gallery-folder-chevron" });
-      chevron.setText("›");
+      if (isGrid) {
+        card.addClass("note-gallery-card--grid");
+        const media = card.createDiv({ cls: "note-gallery-grid-media note-gallery-grid-media--folder" });
+        setIcon(media, "folder");
+      } else {
+        const folderIcon = card.createDiv({ cls: "note-gallery-folder-chevron" });
+        setIcon(folderIcon, "folder");
+      }
       const textDiv = card.createDiv({ cls: "note-gallery-text" });
       textDiv.createDiv({ cls: "note-gallery-title note-gallery-folder-title", text: subfolder.name });
       const fileCount = subfolder.children.filter(f => f instanceof TFile).length;
@@ -1221,14 +1281,7 @@ class NoteGalleryView extends ItemView {
       });
     }
 
-    // Counter
-    const toolbar = this.containerEl.querySelector(".note-gallery-toolbar") as HTMLElement;
-    const existingCounter = toolbar?.querySelector(".note-gallery-counter");
-    if (existingCounter) existingCounter.remove();
-    if (toolbar) {
-      const counter = toolbar.createDiv({ cls: "note-gallery-counter" });
-      counter.setText(files.length + " " + s.files + (subfolders.length > 0 ? ` · ${subfolders.length} ` + s.subfolders : ""));
-    }
+    setCounter(files.length + " " + s.files + (subfolders.length > 0 ? ` · ${subfolders.length} ` + s.subfolders : ""));
 
     for (const file of files) {
       if (this._listRenderGen !== gen) return;
@@ -1262,13 +1315,16 @@ class NoteGalleryView extends ItemView {
     const dateStr = formatDate(frontmatter, file, dateLocale);
     const favorite = isFavorite(frontmatter);
     const { coverMode, coverTag } = this.plugin.settings;
+    const isGrid = this.plugin.settings.viewMode === "grid";
     const coverTags: string[] = Array.isArray(frontmatter?.tags) ? (frontmatter.tags as unknown[]).map(String) : [];
-    const isCoverMode =
+    // Grid tiles already show a large image, so the cover layout only applies in list view.
+    const isCoverMode = !isGrid && (
       coverMode === "always" ||
-      (coverMode === "tag" && coverTag.trim() !== "" && coverTags.includes(coverTag.trim()));
+      (coverMode === "tag" && coverTag.trim() !== "" && coverTags.includes(coverTag.trim())));
 
     const card = listContainer.createDiv({ cls: "note-gallery-card" });
     if (isCoverMode) card.addClass("note-gallery-card--cover");
+    if (isGrid) card.addClass("note-gallery-card--grid");
 
     // Drag: allow note to be dragged onto a folder card
     card.draggable = true;
@@ -1280,22 +1336,31 @@ class NoteGalleryView extends ItemView {
       card.removeClass("note-gallery-card--dragging");
     });
 
-    // Left: text
+    // Grid: media area on top (image or placeholder icon)
+    const gridMedia = isGrid ? card.createDiv({ cls: "note-gallery-grid-media" }) : null;
+
+    // Text (left in list view, below the media area in grid view)
     const textDiv = card.createDiv({ cls: "note-gallery-text" });
     const titleRow = textDiv.createDiv({ cls: "note-gallery-title-row" });
     if (favorite) titleRow.createSpan({ cls: "note-gallery-favorite-star", text: "★ " });
     const titleEl = titleRow.createSpan({ cls: "note-gallery-title" });
     titleEl.setText(file.basename);
-    if (titleWrap && !isCoverMode) titleEl.addClass("note-gallery-title--wrap");
+    if (titleWrap && !isCoverMode && !isGrid) titleEl.addClass("note-gallery-title--wrap");
 
-    if (category) textDiv.createDiv({ cls: "note-gallery-category", text: category });
-    textDiv.createDiv({ cls: "note-gallery-date", text: dateStr });
-    if (showPreview && previewText) {
+    const metaDiv = textDiv.createDiv({ cls: "note-gallery-meta" });
+    if (category) {
+      metaDiv.createSpan({ cls: "note-gallery-category", text: category });
+      metaDiv.createSpan({ cls: "note-gallery-meta-sep", text: " · " });
+    }
+    metaDiv.createSpan({ text: dateStr });
+
+    if (showPreview && previewText && !isGrid) {
       const previewEl = textDiv.createDiv({ text: previewText });
       previewEl.addClass(previewLines === 2 ? "note-gallery-preview--two-lines" : "note-gallery-preview");
     }
 
-    // Right: image
+    // Image
+    let imgFile: TFile | null = null;
     if (imgPath) {
       const pathsToTry = [
         imgPath,
@@ -1305,31 +1370,40 @@ class NoteGalleryView extends ItemView {
         (file.parent?.path ? file.parent.path + "/" : "") + imgPath,
       ].filter(Boolean) as string[];
 
-      let imgFile: TFile | null = null;
       for (const p of pathsToTry) {
         const found = this.app.vault.getAbstractFileByPath(p);
         if (found instanceof TFile) { imgFile = found; break; }
       }
+    }
 
+    if (gridMedia) {
       if (imgFile) {
-        const url = this.app.vault.getResourcePath(imgFile);
-        if (isCoverMode) {
-          const coverDiv = card.createDiv({ cls: "note-gallery-cover-img" });
-          const img = coverDiv.createEl("img");
-          img.loading = "lazy";
-          img.decoding = "async";
-          img.src = url;
-          img.alt = file.basename;
-        } else {
-          const imgDiv = card.createDiv({ cls: "note-gallery-thumb" });
-          imgDiv.style.width = thumbnailSize + "px";
-          imgDiv.style.height = thumbnailSize + "px";
-          const img = imgDiv.createEl("img");
-          img.loading = "lazy";
-          img.decoding = "async";
-          img.src = url;
-          img.alt = file.basename;
-        }
+        const img = gridMedia.createEl("img");
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.src = this.app.vault.getResourcePath(imgFile);
+        img.alt = file.basename;
+      } else {
+        setIcon(gridMedia, "file-text");
+      }
+    } else if (imgFile) {
+      const url = this.app.vault.getResourcePath(imgFile);
+      if (isCoverMode) {
+        const coverDiv = card.createDiv({ cls: "note-gallery-cover-img" });
+        const img = coverDiv.createEl("img");
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.src = url;
+        img.alt = file.basename;
+      } else {
+        const imgDiv = card.createDiv({ cls: "note-gallery-thumb" });
+        imgDiv.style.width = thumbnailSize + "px";
+        imgDiv.style.height = thumbnailSize + "px";
+        const img = imgDiv.createEl("img");
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.src = url;
+        img.alt = file.basename;
       }
     }
 
@@ -1462,7 +1536,9 @@ class NoteGalleryView extends ItemView {
       hour: "2-digit", minute: "2-digit",
     });
 
+    const isGrid = this.plugin.settings.viewMode === "grid";
     const card = listContainer.createDiv({ cls: "note-gallery-card" });
+    if (isGrid) card.addClass("note-gallery-card--grid");
 
     // Drag: allow file to be dragged onto a folder card
     card.draggable = true;
@@ -1474,16 +1550,30 @@ class NoteGalleryView extends ItemView {
       card.removeClass("note-gallery-card--dragging");
     });
 
+    const gridMedia = isGrid ? card.createDiv({ cls: "note-gallery-grid-media" }) : null;
+
     const textDiv = card.createDiv({ cls: "note-gallery-text" });
     const titleRow = textDiv.createDiv({ cls: "note-gallery-title-row" });
     const titleEl = titleRow.createSpan({ cls: "note-gallery-title" });
     titleEl.setText(file.name);
-    if (titleWrap) titleEl.addClass("note-gallery-title--wrap");
+    if (titleWrap && !isGrid) titleEl.addClass("note-gallery-title--wrap");
 
-    textDiv.createDiv({ cls: "note-gallery-category", text: file.extension.toUpperCase() });
-    textDiv.createDiv({ cls: "note-gallery-date", text: dateStr });
+    const metaDiv = textDiv.createDiv({ cls: "note-gallery-meta" });
+    metaDiv.createSpan({ cls: "note-gallery-category", text: file.extension.toUpperCase() });
+    metaDiv.createSpan({ cls: "note-gallery-meta-sep", text: " · " });
+    metaDiv.createSpan({ text: dateStr });
 
-    if (isImage) {
+    if (gridMedia) {
+      if (isImage) {
+        const img = gridMedia.createEl("img");
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.src = this.app.vault.getResourcePath(file);
+        img.alt = file.name;
+      } else {
+        setIcon(gridMedia, "file");
+      }
+    } else if (isImage) {
       const imgDiv = card.createDiv({ cls: "note-gallery-thumb" });
       imgDiv.style.width = thumbnailSize + "px";
       imgDiv.style.height = thumbnailSize + "px";
