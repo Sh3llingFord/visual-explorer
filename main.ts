@@ -33,11 +33,7 @@ interface NoteGallerySettings {
   previewLines: 1 | 2;
   sortFavoritesFirst: boolean;
   openOnStartup: boolean;
-  menuShowSortModified: boolean;
-  menuShowSortCreated: boolean;
-  menuShowSortName: boolean;
-  menuShowSortTitleDate: boolean;
-  menuShowSortNone: boolean;
+  menuShowSort: boolean;
   menuShowFavorites: boolean;
   menuShowRecent: boolean;
   menuShowNewDoc: boolean;
@@ -71,11 +67,7 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   previewLines: 1,
   sortFavoritesFirst: false,
   openOnStartup: false,
-  menuShowSortModified: true,
-  menuShowSortCreated: true,
-  menuShowSortName: true,
-  menuShowSortTitleDate: true,
-  menuShowSortNone: true,
+  menuShowSort: true,
   menuShowFavorites: true,
   menuShowRecent: true,
   menuShowNewDoc: true,
@@ -950,7 +942,7 @@ class NoteGalleryView extends ItemView {
     if (ts.toolbarShowSort) {
       makeToolbarBtn("arrow-up-down", s.sort, (e) => {
         const menu = new Menu();
-        this.addSortMenuItems(menu, container, filesFolder, dateLocale, titleWrap, thumbnailSize, false);
+        this.addSortMenuItems(menu, container, filesFolder, dateLocale, titleWrap, thumbnailSize);
         menu.showAtMouseEvent(e);
       });
     }
@@ -1016,9 +1008,8 @@ class NoteGalleryView extends ItemView {
       };
 
       // Sort entries live in the "+" menu only while the toolbar has no sort button
-      const anySortShown = ms.menuShowSortModified || ms.menuShowSortCreated || ms.menuShowSortName || ms.menuShowSortTitleDate;
-      if (!ms.toolbarShowSort && (anySortShown || ms.menuShowSortNone)) {
-        addGroup(() => this.addSortMenuItems(menu, container, filesFolder, dateLocale, titleWrap, thumbnailSize, true));
+      if (!ms.toolbarShowSort && ms.menuShowSort) {
+        addGroup(() => this.addSortMenuItems(menu, container, filesFolder, dateLocale, titleWrap, thumbnailSize));
       }
 
       const navBuilders: (() => void)[] = [];
@@ -1073,26 +1064,23 @@ class NoteGalleryView extends ItemView {
     return this.plugin.settings.viewMode;
   }
 
-  // Shared between the toolbar sort button (all options) and the "+" menu
-  // (filtered by the menuShow* settings).
+  // Shared between the toolbar sort button and the "+" menu.
   private addSortMenuItems(
     menu: Menu,
     container: HTMLElement,
     filesFolder: string,
     dateLocale: string,
     titleWrap: boolean,
-    thumbnailSize: number,
-    respectMenuSettings: boolean
+    thumbnailSize: number
   ) {
     const ms = this.plugin.settings;
     const s = STRINGS[ms.language];
-    const allSortTypes: { show: boolean; label: string; asc: string; desc: string; defaultDir: "asc" | "desc" }[] = [
-      { show: ms.menuShowSortModified,  label: s.sortModified,  asc: "modified-asc",   desc: "modified-desc",   defaultDir: "desc" },
-      { show: ms.menuShowSortCreated,   label: s.sortCreated,   asc: "created-asc",    desc: "created-desc",    defaultDir: "desc" },
-      { show: ms.menuShowSortName,      label: s.sortName,      asc: "name-asc",       desc: "name-desc",       defaultDir: "asc" },
-      { show: ms.menuShowSortTitleDate, label: s.sortTitleDate, asc: "title-date-asc", desc: "title-date-desc", defaultDir: "desc" },
+    const sortTypes: { label: string; asc: string; desc: string; defaultDir: "asc" | "desc" }[] = [
+      { label: s.sortModified,  asc: "modified-asc",   desc: "modified-desc",   defaultDir: "desc" },
+      { label: s.sortCreated,   asc: "created-asc",    desc: "created-desc",    defaultDir: "desc" },
+      { label: s.sortName,      asc: "name-asc",       desc: "name-desc",       defaultDir: "asc" },
+      { label: s.sortTitleDate, asc: "title-date-asc", desc: "title-date-desc", defaultDir: "desc" },
     ];
-    const sortTypes = allSortTypes.filter(t => !respectMenuSettings || t.show);
 
     const rerenderList = async () => {
       const lc = container.querySelector(".note-gallery-list") as HTMLElement;
@@ -1112,17 +1100,15 @@ class NoteGalleryView extends ItemView {
         });
       });
     }
-    if (!respectMenuSettings || ms.menuShowSortNone) {
-      menu.addItem(item => {
-        item.setTitle(s.sortNone);
-        item.setIcon("rotate-ccw");
-        item.setChecked(this.currentSort === ms.sortBy);
-        item.onClick(async () => {
-          this.currentSort = ms.sortBy;
-          await rerenderList();
-        });
+    menu.addItem(item => {
+      item.setTitle(s.sortNone);
+      item.setIcon("rotate-ccw");
+      item.setChecked(this.currentSort === ms.sortBy);
+      item.onClick(async () => {
+        this.currentSort = ms.sortBy;
+        await rerenderList();
       });
-    }
+    });
   }
 
   private collectFilesRecursively(folder: TFolder): TFile[] {
@@ -2035,19 +2021,13 @@ class NoteGallerySettingTab extends PluginSettingTab {
     containerEl.createEl("h3", { text: s.stSectionMenu, cls: "note-gallery-settings-section" });
 
     type MenuToggleKey =
-      | "menuShowSortModified" | "menuShowSortCreated"
-      | "menuShowSortName"     | "menuShowSortTitleDate"
-      | "menuShowSortNone"
+      | "menuShowSort"
       | "menuShowFavorites" | "menuShowRecent"
       | "menuShowNewDoc"    | "menuShowCreateFolder"
       | "menuShowOpenSettings";
 
     const menuToggles: { key: MenuToggleKey; label: string }[] = [
-      { key: "menuShowSortModified",  label: s.sortModified },
-      { key: "menuShowSortCreated",   label: s.sortCreated },
-      { key: "menuShowSortName",      label: s.sortName },
-      { key: "menuShowSortTitleDate", label: s.sortTitleDate },
-      { key: "menuShowSortNone",      label: s.sortNone },
+      { key: "menuShowSort",          label: s.sort },
       { key: "menuShowFavorites",     label: s.favorites },
       { key: "menuShowRecent",        label: s.recent },
       { key: "menuShowNewDoc",        label: s.newDoc },
@@ -2155,9 +2135,15 @@ export default class NoteGalleryPlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const raw = (await this.loadData()) as Record<string, unknown> | null;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, raw);
     // Object.assign is shallow — don't share/mutate the default map object
     this.settings.folderViewModes = { ...(this.settings.folderViewModes ?? {}) };
+    // Migrate the five per-sort-type menu toggles to the single menuShowSort
+    if (raw && raw.menuShowSort === undefined && raw.menuShowSortModified !== undefined) {
+      this.settings.menuShowSort = !!(raw.menuShowSortModified || raw.menuShowSortCreated ||
+        raw.menuShowSortName || raw.menuShowSortTitleDate || raw.menuShowSortNone);
+    }
     const legacyMap: Record<string, NoteGallerySettings["sortBy"]> = {
       modified: "modified-desc",
       created: "created-desc",
@@ -2168,8 +2154,18 @@ export default class NoteGalleryPlugin extends Plugin {
     }
   }
 
+  // Settings changes apply immediately to every open view, not only to
+  // views that happen to re-render later (navigation, vault events).
+  // Debounced: text settings call saveSettings on every keystroke.
+  private refreshViews = debounce(() => {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
+      if (leaf.view instanceof NoteGalleryView) leaf.view.render();
+    }
+  }, 250);
+
   async saveSettings() {
     await this.saveData(this.settings);
+    this.refreshViews();
   }
 
 }

@@ -161,7 +161,7 @@ Sort, View toggle, New document, Create folder, Favorites, Recently opened, Open
 
 ### Menu content
 Each entry in the **+** menu can be individually shown or hidden in settings:
-Sort (Modified / Created / Name / Title date / Reset), Favorites, Recently opened, New document, Create folder, Open settings.
+Sort, Favorites, Recently opened, New document, Create folder, Open settings.
 
 ## Image support
 
