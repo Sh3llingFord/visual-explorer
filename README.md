@@ -5,6 +5,7 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
 ## Features
 
 - **Card view** — each note shows title, category, date, image thumbnail, and optional text preview
+- **Grid view** — toggle between the card list and an image-first grid layout directly in the toolbar; the choice is remembered
 - **Cover layout** — notes can display a large cover image instead of a small thumbnail (always, or per tag)
 - **Folder navigation** — subfolders always appear at the top as clickable entries with a breadcrumb trail
 - **Live search** — filter notes and folders by title or tag instantly
@@ -16,7 +17,7 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
   - Recently opened — shows the last N modified notes across the vault
   - New document — create a note directly in the current folder
   - Create folder — create a new subfolder
-- **Sorting** — select directly in the toolbar, per view session:
+- **Sorting** — via the sort button in the toolbar (or the + menu), per view session:
   - Modified (newest → oldest / oldest → newest)
   - Created (newest → oldest / oldest → newest) — respects `date`/`created` frontmatter
   - Name (A → Z / Z → A) — applies to both notes and subfolders
@@ -84,7 +85,7 @@ At vault root the button always shows the globe icon — the scope is vault-wide
 When notes in the current view have `tags` or `categories` in their frontmatter, clickable tag chips appear below the search bar. Clicking a chip sets it as the search query; clicking again clears it.
 
 ### Sorting
-Tap the **+** button and select a sort option at the top of the menu. The active sort is marked with a checkmark. Sort state is per view session; the default is set in plugin settings.
+Tap the **sort button** (↑↓) in the toolbar — or the top of the **+** menu — and select a sort option. The active sort is marked with a checkmark. Sort state is per view session; the default is set in plugin settings.
 
 | Option | Description |
 |---|---|
