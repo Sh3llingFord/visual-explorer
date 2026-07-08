@@ -5,7 +5,8 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
 ## Features
 
 - **Card view** — each note shows title, category, date, image thumbnail, and optional text preview
-- **Grid view** — toggle between the card list and an image-first grid layout directly in the toolbar; the choice is remembered
+- **Grid view** — toggle between the card list and an image-first grid layout directly in the toolbar; the choice is remembered **per folder** (with a global default in settings)
+- **Configurable toolbar buttons** — choose which actions appear next to the search bar: sort, view toggle, new document, create folder, favorites, recently opened, settings
 - **Cover layout** — notes can display a large cover image instead of a small thumbnail (always, or per tag)
 - **Folder navigation** — subfolders always appear at the top as clickable entries with a breadcrumb trail
 - **Live search** — filter notes and folders by title or tag instantly
@@ -17,7 +18,7 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
   - Recently opened — shows the last N modified notes across the vault
   - New document — create a note directly in the current folder
   - Create folder — create a new subfolder
-- **Sorting** — via the sort button in the toolbar (or the + menu), per view session:
+- **Sorting** — via the + menu, or an optional sort button in the toolbar (while the toolbar button is enabled, the + menu hides its sort entries automatically), per view session:
   - Modified (newest → oldest / oldest → newest)
   - Created (newest → oldest / oldest → newest) — respects `date`/`created` frontmatter
   - Name (A → Z / Z → A) — applies to both notes and subfolders
@@ -85,7 +86,7 @@ At vault root the button always shows the globe icon — the scope is vault-wide
 When notes in the current view have `tags` or `categories` in their frontmatter, clickable tag chips appear below the search bar. Clicking a chip sets it as the search query; clicking again clears it.
 
 ### Sorting
-Tap the **sort button** (↑↓) in the toolbar — or the top of the **+** menu — and select a sort option. The active sort is marked with a checkmark. Sort state is per view session; the default is set in plugin settings.
+Select a sort option at the top of the **+** menu — or enable the **sort button** (↑↓) in Settings → Toolbar. While the toolbar sort button is enabled, the sort entries are hidden from the + menu automatically, so they never appear twice. The active sort is marked with a checkmark. Sort state is per view session; the default is set in plugin settings.
 
 | Option | Description |
 |---|---|
@@ -110,6 +111,12 @@ Notes can be displayed with a large cover image spanning the full card width ins
 - **Recently opened** — shows the last N modified notes vault-wide
 - **New document** — creates a note in the current folder
 - **Create folder** — creates a new subfolder
+
+### Toolbar buttons
+The buttons between the search bar and the + button are configurable via **Settings → Toolbar**. Available actions: Sort, View toggle (list/grid), New document, Create folder, Favorites, Recently opened, Open settings. By default only the view toggle is enabled.
+
+### Per-folder view memory
+The list/grid toggle remembers the choice **per folder**: switch the photography folder to grid and it stays grid, while other folders keep their own view. Folders without an explicit choice use the **Default view** from settings. In the Favorites and Recently opened views the toggle changes the global default.
 
 ### Actions via long-press / right-click on a note
 - **Add / remove favorite** — sets `favorite: true` in frontmatter
@@ -142,10 +149,15 @@ Notes can be displayed with a large cover image spanning the full card width ins
 | Cover tag | `vec` | Tag that triggers the cover layout (only relevant for "By tag") |
 | Files folder | `Files` | Path to the folder containing images, relative to vault root |
 | Archive folder | `Archiv` | Destination folder for the Archive action, relative to vault root |
+| Default view | List | View for folders without their own list/grid choice |
 | Default sort | Modified (newest first) | Default sort for new views |
 | Title date format | dd.mm.yyyy | Date format parsed from the start of filenames for "Title date" sort |
 | Recent count | 30 | How many notes to show in "Recently opened" (5–100) |
 | Breadcrumb font size | 12px | Font size of the breadcrumb path (10–18px) |
+
+### Toolbar
+Each toolbar button can be individually shown or hidden in settings:
+Sort, View toggle, New document, Create folder, Favorites, Recently opened, Open settings.
 
 ### Menu content
 Each entry in the **+** menu can be individually shown or hidden in settings:
