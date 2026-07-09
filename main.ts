@@ -12,6 +12,7 @@ import {
   Menu,
   AbstractInputSuggest,
   debounce,
+  normalizePath,
   setIcon,
 } from "obsidian";
 
@@ -122,6 +123,7 @@ const STRINGS = {
     actions: "Aktionen",
     error: "Fehler",
     openGallery: "Visual Explorer öffnen",
+    openGalleryCommand: "Galerie öffnen",
     openAsGallery: "Als Galerie öffnen",
     stThumbSize: "Thumbnail-Größe",
     stThumbSizeDesc: "Breite und Höhe des Vorschaubilds in Pixeln",
@@ -229,6 +231,7 @@ const STRINGS = {
     actions: "Actions",
     error: "Error",
     openGallery: "Open Visual Explorer",
+    openGalleryCommand: "Open gallery",
     openAsGallery: "Open as gallery",
     stThumbSize: "Thumbnail size",
     stThumbSizeDesc: "Width and height of the preview image in pixels",
@@ -726,7 +729,7 @@ class NoteGalleryView extends ItemView {
         const name = input.value.trim();
         if (name) {
           try {
-            const path = (folderPath ? folderPath + "/" : "") + name + ".md";
+            const path = normalizePath((folderPath ? folderPath + "/" : "") + name + ".md");
             const file = await this.app.vault.create(path, "");
             await this.app.workspace.getLeaf(false).openFile(file);
             await this.render();
@@ -802,12 +805,16 @@ class NoteGalleryView extends ItemView {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("note-gallery-container");
-    this.containerEl.style.position = "relative";
+    this.containerEl.addClass("note-gallery-view");
+    // Dynamic, user-configured sizes go through CSS variables so all
+    // visual rules stay in styles.css (theme-compatible, no inline styles).
+    container.style.setProperty("--note-gallery-thumb-size", thumbnailSize + "px");
+    container.style.setProperty("--note-gallery-breadcrumb-size", breadcrumbFontSize + "px");
 
     if (window.visualViewport) {
       const adjustHeight = () => {
         const top = container.getBoundingClientRect().top;
-        container.style.height = (window.visualViewport!.height - top) + 'px';
+        container.style.setProperty("--note-gallery-viewport-height", (window.visualViewport!.height - top) + "px");
       };
       adjustHeight();
       window.visualViewport.addEventListener('resize', adjustHeight);
@@ -816,7 +823,7 @@ class NoteGalleryView extends ItemView {
     }
 
     const toolbar = container.createDiv({ cls: "note-gallery-toolbar" });
-    this.buildBreadcrumb(toolbar, s, breadcrumbFontSize);
+    this.buildBreadcrumb(toolbar, s);
     this.buildControlsRow(toolbar, container, s, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
 
     const allTags = this.collectTagsForCurrentView();
@@ -826,11 +833,10 @@ class NoteGalleryView extends ItemView {
     await this.renderList(listContainer, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
   }
 
-  private buildBreadcrumb(toolbar: HTMLElement, s: typeof STRINGS["de"], breadcrumbFontSize: number) {
+  private buildBreadcrumb(toolbar: HTMLElement, s: typeof STRINGS["de"]) {
     const header = toolbar.createDiv({ cls: "note-gallery-header" });
     if (this.mode === "folder") {
       const breadcrumbEl = header.createDiv({ cls: "note-gallery-breadcrumb" });
-      breadcrumbEl.style.fontSize = breadcrumbFontSize + "px";
       this.breadcrumb.forEach((crumb, i) => {
         if (i > 0) breadcrumbEl.createSpan({ cls: "note-gallery-breadcrumb-sep", text: " / " });
         const crumbEl = breadcrumbEl.createSpan({ cls: "note-gallery-breadcrumb-item", text: crumb.name || "Vault" });
@@ -841,7 +847,6 @@ class NoteGalleryView extends ItemView {
       });
     } else {
       const modeLabel = header.createDiv({ cls: "note-gallery-breadcrumb" });
-      modeLabel.style.fontSize = breadcrumbFontSize + "px";
       modeLabel.createSpan({ cls: "note-gallery-breadcrumb-link", text: s.back })
         .addEventListener("click", () => { this.mode = "folder"; this.render(); });
       modeLabel.createSpan({ cls: "note-gallery-breadcrumb-sep", text: " / " });
@@ -871,7 +876,7 @@ class NoteGalleryView extends ItemView {
 
     const clearBtn = searchWrapper.createDiv({ cls: "note-gallery-search-clear" });
     clearBtn.setText("✕");
-    clearBtn.style.display = this.searchQuery ? "flex" : "none";
+    clearBtn.toggleClass("is-hidden", !this.searchQuery);
 
     const debouncedSearchRender = debounce(() => {
       const lc = container.querySelector(".note-gallery-list") as HTMLElement;
@@ -908,7 +913,7 @@ class NoteGalleryView extends ItemView {
 
     searchInput.addEventListener("input", () => {
       this.searchQuery = searchInput.value;
-      clearBtn.style.display = this.searchQuery ? "flex" : "none";
+      clearBtn.toggleClass("is-hidden", !this.searchQuery);
       debouncedSearchRender();
     });
 
@@ -916,7 +921,7 @@ class NoteGalleryView extends ItemView {
       if (e.key === "Escape") {
         this.searchQuery = "";
         searchInput.value = "";
-        clearBtn.style.display = "none";
+        clearBtn.addClass("is-hidden");
         await this.render();
       }
     });
@@ -924,7 +929,7 @@ class NoteGalleryView extends ItemView {
     clearBtn.addEventListener("click", async () => {
       this.searchQuery = "";
       searchInput.value = "";
-      clearBtn.style.display = "none";
+      clearBtn.addClass("is-hidden");
       const lc = container.querySelector(".note-gallery-list") as HTMLElement;
       if (lc) await this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
       searchInput.focus();
@@ -963,7 +968,7 @@ class NoteGalleryView extends ItemView {
     if (ts.toolbarShowCreateFolder) {
       makeToolbarBtn("folder-plus", s.createFolder, () => {
         new CreateFolderModal(this.app, this.folder.path, s, async (name) => {
-          const path = (this.folder.path ? this.folder.path + "/" : "") + name;
+          const path = normalizePath((this.folder.path ? this.folder.path + "/" : "") + name);
           await this.app.vault.createFolder(path);
           await this.render();
         }).open();
@@ -991,7 +996,7 @@ class NoteGalleryView extends ItemView {
 
     const newBtn = controls.createEl("button", { cls: "note-gallery-new-btn", text: "+" });
     newBtn.title = s.actions;
-    newBtn.addEventListener("click", (e) => {
+    newBtn.addEventListener("click", (e: MouseEvent | TouchEvent) => {
       e.stopPropagation();
       const ms = this.plugin.settings;
 
@@ -1041,7 +1046,7 @@ class NoteGalleryView extends ItemView {
         item.setTitle(s.createFolder).setIcon("folder-plus");
         item.onClick(() => {
           new CreateFolderModal(this.app, this.folder.path, s, async (name) => {
-            const path = (this.folder.path ? this.folder.path + "/" : "") + name;
+            const path = normalizePath((this.folder.path ? this.folder.path + "/" : "") + name);
             await this.app.vault.createFolder(path);
             await this.render();
           }).open();
@@ -1235,7 +1240,7 @@ class NoteGalleryView extends ItemView {
             icon: "pencil",
             action: () => {
               new RenameFolderModal(this.app, subfolder, s, async (newName) => {
-                const newPath = (subfolder.parent?.path ? subfolder.parent.path + "/" : "") + newName;
+                const newPath = normalizePath((subfolder.parent?.path ? subfolder.parent.path + "/" : "") + newName);
                 await this.app.fileManager.renameFile(subfolder, newPath);
                 await this.render();
               }).open();
@@ -1265,7 +1270,7 @@ class NoteGalleryView extends ItemView {
               if (!this.app.vault.getAbstractFileByPath(archivePath)) {
                 await this.app.vault.createFolder(archivePath);
               }
-              const newPath = archivePath + "/" + subfolder.name;
+              const newPath = normalizePath(archivePath + "/" + subfolder.name);
               await this.app.fileManager.renameFile(subfolder, newPath);
               new Notice(s.archived(subfolder.name, archivePath));
               await this.render();
@@ -1447,13 +1452,13 @@ class NoteGalleryView extends ItemView {
     // Image
     let imgFile: TFile | null = null;
     if (imgPath) {
-      const pathsToTry = [
+      const pathsToTry = ([
         imgPath,
         filesFolder + "/" + imgPath.split("/").pop(),
         "Vault/" + imgPath,
         "Vault/" + filesFolder + "/" + imgPath.split("/").pop(),
         (file.parent?.path ? file.parent.path + "/" : "") + imgPath,
-      ].filter(Boolean) as string[];
+      ].filter(Boolean) as string[]).map((p) => normalizePath(p));
 
       for (const p of pathsToTry) {
         const found = this.app.vault.getAbstractFileByPath(p);
@@ -1482,8 +1487,6 @@ class NoteGalleryView extends ItemView {
         img.alt = file.basename;
       } else {
         const imgDiv = card.createDiv({ cls: "note-gallery-thumb" });
-        imgDiv.style.width = thumbnailSize + "px";
-        imgDiv.style.height = thumbnailSize + "px";
         const img = imgDiv.createEl("img");
         img.loading = "lazy";
         img.decoding = "async";
@@ -1513,7 +1516,7 @@ class NoteGalleryView extends ItemView {
           icon: "pencil",
           action: () => {
             new RenameModal(this.app, file, s, async (newName) => {
-              const newPath = (file.parent?.path ? file.parent.path + "/" : "") + newName + ".md";
+              const newPath = normalizePath((file.parent?.path ? file.parent.path + "/" : "") + newName + ".md");
               await this.app.fileManager.renameFile(file, newPath);
               await this.render();
             }).open();
@@ -1559,7 +1562,7 @@ class NoteGalleryView extends ItemView {
             if (!this.app.vault.getAbstractFileByPath(archivePath)) {
               await this.app.vault.createFolder(archivePath);
             }
-            const newPath = archivePath + "/" + file.name;
+            const newPath = normalizePath(archivePath + "/" + file.name);
             await this.app.fileManager.renameFile(file, newPath);
             new Notice(s.archived(file.basename, archivePath));
             await this.render();
@@ -1660,8 +1663,6 @@ class NoteGalleryView extends ItemView {
       }
     } else if (isImage) {
       const imgDiv = card.createDiv({ cls: "note-gallery-thumb" });
-      imgDiv.style.width = thumbnailSize + "px";
-      imgDiv.style.height = thumbnailSize + "px";
       const url = this.app.vault.getResourcePath(file);
       const img = imgDiv.createEl("img");
       img.loading = "lazy";
@@ -1679,7 +1680,7 @@ class NoteGalleryView extends ItemView {
           icon: "pencil",
           action: () => {
             new RenameModal(this.app, file, s, async (newName) => {
-              const newPath = (file.parent?.path ? file.parent.path + "/" : "") + newName + "." + file.extension;
+              const newPath = normalizePath((file.parent?.path ? file.parent.path + "/" : "") + newName + "." + file.extension);
               await this.app.fileManager.renameFile(file, newPath);
               await this.render();
             }).open();
@@ -1932,7 +1933,10 @@ class NoteGallerySettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
         text.setPlaceholder("Files").setValue(this.plugin.settings.filesFolder)
-          .onChange(async (value) => { this.plugin.settings.filesFolder = value.trim(); await this.plugin.saveSettings(); });
+          .onChange(async (value) => {
+            this.plugin.settings.filesFolder = value.trim() ? normalizePath(value.trim()) : "";
+            await this.plugin.saveSettings();
+          });
       });
 
     new Setting(containerEl)
@@ -1944,7 +1948,10 @@ class NoteGallerySettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
         text.setPlaceholder("Archiv").setValue(this.plugin.settings.archiveFolder)
-          .onChange(async (value) => { this.plugin.settings.archiveFolder = value.trim(); await this.plugin.saveSettings(); });
+          .onChange(async (value) => {
+            this.plugin.settings.archiveFolder = value.trim() ? normalizePath(value.trim()) : "";
+            await this.plugin.saveSettings();
+          });
       });
 
     // ── Sortierung & Ansichten / Sorting & Views ──────────────────
@@ -2094,43 +2101,42 @@ export default class NoteGalleryPlugin extends Plugin {
 
     this.addSettingTab(new NoteGallerySettingTab(this.app, this));
 
+    const sInit = STRINGS[this.settings.language];
+    this.addRibbonIcon("layout-grid", sInit.openGallery, async () => {
+      await this.openGallery(this.app.vault.getRoot());
+    });
+
+    this.addCommand({
+      id: "open-note-gallery",
+      name: sInit.openGalleryCommand,
+      callback: async () => {
+        await this.openGallery(this.app.vault.getRoot());
+      },
+    });
+
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (file instanceof TFolder) {
+          menu.addItem((item) => {
+            item.setTitle(STRINGS[this.settings.language].openAsGallery).setIcon("layout-grid")
+              .onClick(async () => {
+                const leaf = this.app.workspace.getLeaf(true);
+                await leaf.setViewState({
+                  type: VIEW_TYPE,
+                  active: true,
+                  state: { folderPath: file.path },
+                });
+              });
+          });
+        }
+      })
+    );
+
     this.app.workspace.onLayoutReady(() => {
       if (this.settings.openOnStartup) {
         this.activateView();
       }
-
-      const sInit = STRINGS[this.settings.language];
-      this.addRibbonIcon("layout-grid", sInit.openGallery, async () => {
-        await this.openGallery(this.app.vault.getRoot());
-      });
-
-      this.addCommand({
-        id: "open-note-gallery",
-        name: sInit.openGallery,
-        callback: async () => {
-          await this.openGallery(this.app.vault.getRoot());
-        },
-      });
-
-      this.registerEvent(
-        this.app.workspace.on("file-menu", (menu, file) => {
-          if (file instanceof TFolder) {
-            menu.addItem((item) => {
-              item.setTitle(STRINGS[this.settings.language].openAsGallery).setIcon("layout-grid")
-                .onClick(async () => {
-                  const leaf = this.app.workspace.getLeaf(true);
-                  await leaf.setViewState({
-                    type: VIEW_TYPE,
-                    active: true,
-                    state: { folderPath: file.path },
-                  });
-                });
-            });
-          }
-        })
-      );
     });
-
   }
 
   async activateView() {

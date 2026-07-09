@@ -1,3 +1,6 @@
+.note-gallery-view {
+  position: relative;
+}
 .note-gallery-container {
   padding: 0;
   display: flex;
@@ -5,6 +8,8 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
+  /* Set from the view when the visual viewport shrinks (mobile keyboard) */
+  height: var(--note-gallery-viewport-height, auto);
 }
 .note-gallery-toolbar {
   padding: 10px 12px 6px;
@@ -24,7 +29,7 @@
   gap: 8px;
 }
 .note-gallery-breadcrumb {
-  font-size: 12px;
+  font-size: var(--note-gallery-breadcrumb-size, 12px);
   color: var(--text-muted);
   flex: 1;
   min-width: 0;
@@ -73,6 +78,9 @@
 }
 .note-gallery-search-clear:hover {
   background: var(--text-normal);
+}
+.note-gallery-search-clear.is-hidden {
+  display: none;
 }
 .note-gallery-new-btn {
   width: 28px;
@@ -220,6 +228,8 @@
 }
 .note-gallery-thumb {
   flex-shrink: 0;
+  width: var(--note-gallery-thumb-size, 72px);
+  height: var(--note-gallery-thumb-size, 72px);
   border-radius: 6px;
   overflow: hidden;
   background: var(--background-modifier-border);
