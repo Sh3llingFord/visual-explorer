@@ -19,7 +19,9 @@
   border-bottom: 1px solid var(--background-modifier-border);
   position: sticky;
   top: 0;
-  background: var(--background-primary);
+  /* The list scrolls in its own box below, so the toolbar needs no own
+     background — this keeps it matching in tabs AND sidebar leaves. */
+  background: transparent;
   z-index: 10;
 }
 .note-gallery-header {
@@ -232,6 +234,29 @@
   overflow: hidden;
   white-space: normal;
 }
+/* ── Compact list style (pre-card look: flat rows with separators) ── */
+.note-gallery-list--flat .note-gallery-card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 0;
+  padding: 8px 10px;
+}
+.note-gallery-list--flat .note-gallery-card:hover {
+  background: var(--background-modifier-hover);
+  box-shadow: none;
+}
+
+.note-gallery-folder-count {
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
 .note-gallery-thumb {
   flex-shrink: 0;
   width: var(--note-gallery-thumb-size, 72px);
@@ -432,6 +457,7 @@
 .note-gallery-card--drag-over .note-gallery-title,
 .note-gallery-card--drag-over .note-gallery-date,
 .note-gallery-card--drag-over .note-gallery-meta,
+.note-gallery-card--drag-over .note-gallery-folder-count,
 .note-gallery-card--drag-over .note-gallery-folder-chevron {
   color: var(--text-on-accent);
 }
