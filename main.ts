@@ -811,7 +811,7 @@ class NoteGalleryView extends ItemView {
           try {
             const path = normalizePath((folderPath ? folderPath + "/" : "") + name + ".md");
             const file = await this.app.vault.create(path, "");
-            await this.app.workspace.getLeaf(false).openFile(file);
+            await this.app.workspace.getLeaf("tab").openFile(file);
             await this.render();
           } catch (err) {
             new Notice(STRINGS[this.plugin.settings.language].error + ": " + String(err));
@@ -1701,7 +1701,7 @@ class NoteGalleryView extends ItemView {
 
     // Open note on tap/click
     card.addEventListener("click", () => {
-      void this.leaf.openFile(file);
+      void this.app.workspace.getLeaf("tab").openFile(file);
     });
   }
 
@@ -1824,7 +1824,7 @@ class NoteGalleryView extends ItemView {
     card.addEventListener("touchcancel", () => window.clearTimeout(longPressTimer));
 
     card.addEventListener("click", () => {
-      void this.leaf.openFile(file);
+      void this.app.workspace.getLeaf("tab").openFile(file);
     });
   }
 
