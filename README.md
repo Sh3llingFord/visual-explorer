@@ -14,10 +14,12 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
 - **Tag chips** — clickable tag filters appear below the search bar when tags are present in the current view
 - **+ button → action menu:**
   - **Sort** — choose from sort options with the active one highlighted (see below)
+  - View toggle — switch between list and grid
   - Favorites — shows all notes with `favorite: true` in frontmatter
   - Recently opened — shows the last N modified notes across the vault
   - New document — create a note directly in the current folder
   - Create folder — create a new subfolder
+  - Every entry is hidden automatically while its toolbar button is enabled — actions are never duplicated and never lost
 - **Sorting** — via the + menu, or an optional sort button in the toolbar (while the toolbar button is enabled, the + menu hides its sort entries automatically), per view session:
   - Modified (newest → oldest / oldest → newest)
   - Created (newest → oldest / oldest → newest) — respects `date`/`created` frontmatter
@@ -161,7 +163,8 @@ Sort, View toggle, New document, Create folder, Favorites, Recently opened, Open
 
 ### Menu content
 Each entry in the **+** menu can be individually shown or hidden in settings:
-Sort, Favorites, Recently opened, New document, Create folder, Open settings.
+Sort, View toggle, Favorites, Recently opened, New document, Create folder, Open settings.
+An entry is hidden automatically while its toolbar button is enabled.
 
 ## Image support
 
