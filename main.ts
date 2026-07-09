@@ -34,6 +34,7 @@ interface NoteGallerySettings {
   sortFavoritesFirst: boolean;
   openOnStartup: boolean;
   menuShowSort: boolean;
+  menuShowViewToggle: boolean;
   menuShowFavorites: boolean;
   menuShowRecent: boolean;
   menuShowNewDoc: boolean;
@@ -68,6 +69,7 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   sortFavoritesFirst: false,
   openOnStartup: false,
   menuShowSort: true,
+  menuShowViewToggle: true,
   menuShowFavorites: true,
   menuShowRecent: true,
   menuShowNewDoc: true,
@@ -163,7 +165,7 @@ const STRINGS = {
     stSectionCard: "Kartenanzeige",
     stSectionSort: "Sortierung & Ansichten",
     stSectionMenu: "Menü-Inhalt",
-    stMenuItemDesc: "Diesen Eintrag im \"+\"-Menü anzeigen",
+    stMenuItemDesc: "Diesen Eintrag im \"+\"-Menü anzeigen. Er wird automatisch ausgeblendet, solange der passende Toolbar-Button aktiv ist.",
     stSectionNav: "Navigation & Layout",
     openSettings: "Einstellungen öffnen",
     openInNewTab: "In neuem Tab öffnen",
@@ -188,8 +190,7 @@ const STRINGS = {
     viewAsList: "Als Liste anzeigen",
     viewAsGrid: "Als Raster anzeigen",
     stSectionToolbar: "Toolbar",
-    stToolbarItemDesc: "Diesen Button in der Toolbar anzeigen",
-    stToolbarSortDesc: "Sortier-Button in der Toolbar anzeigen. Solange er aktiv ist, werden die Sortier-Einträge im \"+\"-Menü automatisch ausgeblendet.",
+    stToolbarItemDesc: "Diesen Button in der Toolbar anzeigen. Solange er aktiv ist, wird der passende Eintrag im \"+\"-Menü automatisch ausgeblendet.",
     stDefaultView: "Standard-Ansicht",
     stDefaultViewDesc: "Ansicht für Ordner ohne eigene Wahl. Der Toolbar-Umschalter merkt sich die Ansicht pro Ordner.",
     stViewList: "Liste",
@@ -271,7 +272,7 @@ const STRINGS = {
     stSectionCard: "Card Display",
     stSectionSort: "Sorting & Views",
     stSectionMenu: "Menu content",
-    stMenuItemDesc: "Show this entry in the \"+\" menu",
+    stMenuItemDesc: "Show this entry in the \"+\" menu. It is hidden automatically while the matching toolbar button is enabled.",
     stSectionNav: "Navigation & Layout",
     openSettings: "Open settings",
     openInNewTab: "Open in new tab",
@@ -296,8 +297,7 @@ const STRINGS = {
     viewAsList: "Show as list",
     viewAsGrid: "Show as grid",
     stSectionToolbar: "Toolbar",
-    stToolbarItemDesc: "Show this button in the toolbar",
-    stToolbarSortDesc: "Show the sort button in the toolbar. While it is enabled, the sort entries in the \"+\" menu are hidden automatically.",
+    stToolbarItemDesc: "Show this button in the toolbar. While it is enabled, the matching entry in the \"+\" menu is hidden automatically.",
     stDefaultView: "Default view",
     stDefaultViewDesc: "View for folders without their own choice. The toolbar toggle remembers the view per folder.",
     stViewList: "List",
@@ -951,13 +951,7 @@ class NoteGalleryView extends ItemView {
 
     if (ts.toolbarShowViewToggle) {
       const isGrid = this.getViewMode() === "grid";
-      makeToolbarBtn(isGrid ? "list" : "layout-grid", isGrid ? s.viewAsList : s.viewAsGrid, async () => {
-        const next = this.getViewMode() === "grid" ? "list" : "grid";
-        if (this.mode === "folder") this.plugin.settings.folderViewModes[this.folder.path] = next;
-        else this.plugin.settings.viewMode = next;
-        await this.plugin.saveSettings();
-        await this.render();
-      });
+      makeToolbarBtn(isGrid ? "list" : "layout-grid", isGrid ? s.viewAsList : s.viewAsGrid, () => this.toggleViewMode());
     }
 
     if (ts.toolbarShowNewDoc) {
@@ -1009,28 +1003,41 @@ class NoteGalleryView extends ItemView {
         hasItems = true;
       };
 
-      // Sort entries live in the "+" menu only while the toolbar has no sort button
-      if (!ms.toolbarShowSort && ms.menuShowSort) {
+      // Every toolbar action is also available in the "+" menu, but an
+      // entry is hidden automatically while its toolbar button is enabled
+      // (never duplicated, never lost). The menuShow* settings still allow
+      // hiding entries entirely.
+      const inMenu = (menuFlag: boolean, toolbarFlag: boolean) => menuFlag && !toolbarFlag;
+
+      if (inMenu(ms.menuShowSort, ms.toolbarShowSort)) {
         addGroup(() => this.addSortMenuItems(menu, container, filesFolder, dateLocale, titleWrap, thumbnailSize));
       }
 
+      if (inMenu(ms.menuShowViewToggle, ms.toolbarShowViewToggle)) {
+        const isGrid = this.getViewMode() === "grid";
+        addGroup(() => menu.addItem(item => {
+          item.setTitle(isGrid ? s.viewAsList : s.viewAsGrid).setIcon(isGrid ? "list" : "layout-grid");
+          item.onClick(() => this.toggleViewMode());
+        }));
+      }
+
       const navBuilders: (() => void)[] = [];
-      if (ms.menuShowFavorites) navBuilders.push(() => menu.addItem(item => {
+      if (inMenu(ms.menuShowFavorites, ms.toolbarShowFavorites)) navBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.favorites).setIcon("star");
         item.onClick(() => { this.mode = "favorites"; this.searchQuery = ""; this.render(); });
       }));
-      if (ms.menuShowRecent) navBuilders.push(() => menu.addItem(item => {
+      if (inMenu(ms.menuShowRecent, ms.toolbarShowRecent)) navBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.recent).setIcon("clock");
         item.onClick(() => { this.mode = "recent"; this.searchQuery = ""; this.render(); });
       }));
       if (navBuilders.length) addGroup(() => navBuilders.forEach(b => b()));
 
       const createBuilders: (() => void)[] = [];
-      if (ms.menuShowNewDoc) createBuilders.push(() => menu.addItem(item => {
+      if (inMenu(ms.menuShowNewDoc, ms.toolbarShowNewDoc)) createBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.newDoc).setIcon("file-plus");
         item.onClick(async () => { await this.createNoteWithName(this.folder.path); });
       }));
-      if (ms.menuShowCreateFolder) createBuilders.push(() => menu.addItem(item => {
+      if (inMenu(ms.menuShowCreateFolder, ms.toolbarShowCreateFolder)) createBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.createFolder).setIcon("folder-plus");
         item.onClick(() => {
           new CreateFolderModal(this.app, this.folder.path, s, async (name) => {
@@ -1042,7 +1049,7 @@ class NoteGalleryView extends ItemView {
       }));
       if (createBuilders.length) addGroup(() => createBuilders.forEach(b => b()));
 
-      if (ms.menuShowOpenSettings) {
+      if (inMenu(ms.menuShowOpenSettings, ms.toolbarShowOpenSettings)) {
         addGroup(() => menu.addItem(item => {
           item.setTitle(s.openSettings).setIcon("settings");
           item.onClick(() => {
@@ -1055,6 +1062,14 @@ class NoteGalleryView extends ItemView {
       if (e instanceof MouseEvent) menu.showAtMouseEvent(e);
       else { const t = e.touches[0] || e.changedTouches[0]; menu.showAtPosition({ x: t.clientX, y: t.clientY }); }
     });
+  }
+
+  private async toggleViewMode() {
+    const next = this.getViewMode() === "grid" ? "list" : "grid";
+    if (this.mode === "folder") this.plugin.settings.folderViewModes[this.folder.path] = next;
+    else this.plugin.settings.viewMode = next;
+    await this.plugin.saveSettings();
+    await this.render();
   }
 
   // Per-folder view choice (exact path match); global viewMode is the
@@ -1996,20 +2011,20 @@ class NoteGallerySettingTab extends PluginSettingTab {
       | "toolbarShowFavorites" | "toolbarShowRecent"
       | "toolbarShowOpenSettings";
 
-    const toolbarToggles: { key: ToolbarToggleKey; label: string; desc: string }[] = [
-      { key: "toolbarShowSort",         label: s.sort,         desc: s.stToolbarSortDesc },
-      { key: "toolbarShowViewToggle",   label: s.stViewToggle, desc: s.stToolbarItemDesc },
-      { key: "toolbarShowNewDoc",       label: s.newDoc,       desc: s.stToolbarItemDesc },
-      { key: "toolbarShowCreateFolder", label: s.createFolder, desc: s.stToolbarItemDesc },
-      { key: "toolbarShowFavorites",    label: s.favorites,    desc: s.stToolbarItemDesc },
-      { key: "toolbarShowRecent",       label: s.recent,       desc: s.stToolbarItemDesc },
-      { key: "toolbarShowOpenSettings", label: s.openSettings, desc: s.stToolbarItemDesc },
+    const toolbarToggles: { key: ToolbarToggleKey; label: string }[] = [
+      { key: "toolbarShowSort",         label: s.sort },
+      { key: "toolbarShowViewToggle",   label: s.stViewToggle },
+      { key: "toolbarShowNewDoc",       label: s.newDoc },
+      { key: "toolbarShowCreateFolder", label: s.createFolder },
+      { key: "toolbarShowFavorites",    label: s.favorites },
+      { key: "toolbarShowRecent",       label: s.recent },
+      { key: "toolbarShowOpenSettings", label: s.openSettings },
     ];
 
-    for (const { key, label, desc } of toolbarToggles) {
+    for (const { key, label } of toolbarToggles) {
       new Setting(containerEl)
         .setName(label)
-        .setDesc(desc)
+        .setDesc(s.stToolbarItemDesc)
         .addToggle(toggle =>
           toggle.setValue(this.plugin.settings[key])
             .onChange(async (value) => {
@@ -2023,13 +2038,14 @@ class NoteGallerySettingTab extends PluginSettingTab {
     containerEl.createEl("h3", { text: s.stSectionMenu, cls: "note-gallery-settings-section" });
 
     type MenuToggleKey =
-      | "menuShowSort"
+      | "menuShowSort" | "menuShowViewToggle"
       | "menuShowFavorites" | "menuShowRecent"
       | "menuShowNewDoc"    | "menuShowCreateFolder"
       | "menuShowOpenSettings";
 
     const menuToggles: { key: MenuToggleKey; label: string }[] = [
       { key: "menuShowSort",          label: s.sort },
+      { key: "menuShowViewToggle",    label: s.stViewToggle },
       { key: "menuShowFavorites",     label: s.favorites },
       { key: "menuShowRecent",        label: s.recent },
       { key: "menuShowNewDoc",        label: s.newDoc },
