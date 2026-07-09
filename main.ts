@@ -848,8 +848,23 @@ class NoteGalleryView extends ItemView {
     this.app.workspace.trigger("active-leaf-change", this.leaf);
   }
 
+  // Frontmatter (tags, categories, favorite, cover tag) is parsed into the
+  // metadata cache asynchronously AFTER the file is written, so the vault
+  // events below re-render with stale data — and edits made via the
+  // properties panel update only the cache. Re-render (debounced) whenever
+  // a relevant cache entry changes.
+  private cacheRender = debounce(() => { void this.render(); }, 400, true);
+
   async onOpen() {
     this.currentSort = this.plugin.settings.sortBy;
+    this.registerEvent(this.app.metadataCache.on("changed", (file) => {
+      const relevant =
+        file.parent?.path === this.folder?.path ||
+        this.mode !== "folder" ||
+        this.searchQuery !== "" ||
+        this.plugin.settings.tagChips === "vault";
+      if (relevant) this.cacheRender();
+    }));
     this.registerEvent(this.app.vault.on("modify", async (file) => {
       if (file instanceof TFile && file.parent?.path === this.folder?.path) await this.render();
     }));
