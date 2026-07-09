@@ -890,7 +890,9 @@ class NoteGalleryView extends ItemView {
       scopeBtn.title = s.searchVaultTooltip;
     } else {
       const updateScopeBtn = () => {
-        setIcon(scopeBtn, this.searchVaultWide ? "globe" : "folder");
+        // folder-search (not plain folder): a bare folder icon next to the
+        // action buttons reads as "create folder" instead of "search scope"
+        setIcon(scopeBtn, this.searchVaultWide ? "globe" : "folder-search");
         scopeBtn.toggleClass("is-active", this.searchVaultWide);
         scopeBtn.setAttribute("aria-label", this.searchVaultWide ? s.searchVaultTooltip : s.searchFolderTooltip);
         scopeBtn.title = this.searchVaultWide ? s.searchVaultTooltip : s.searchFolderTooltip;
