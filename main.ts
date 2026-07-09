@@ -17,6 +17,7 @@ import {
 } from "obsidian";
 
 const VIEW_TYPE = "visual-explorer";
+const SETTINGS_BACKUP_FILE = "visual-explorer-settings.json";
 
 type TitleDateFormat = "dd.mm.yyyy" | "yyyy.mm.dd" | "mm.dd.yyyy" | "dd-mm-yyyy" | "yyyy-mm-dd" | "mm-dd-yyyy";
 
@@ -190,7 +191,24 @@ const STRINGS = {
     stSectionSort: "Sortierung & Ansichten",
     stSectionMenu: "Menü-Inhalt",
     stMenuItemDesc: "Diesen Eintrag im \"+\"-Menü anzeigen. Er wird automatisch ausgeblendet, solange der passende Toolbar-Button aktiv ist.",
-    stSectionNav: "Navigation & Layout",
+    stSectionCardDesc: "Wie Notizen und Ordner in der Liste dargestellt werden.",
+    stSectionSortDesc: "Standardwerte für neue Ansichten — die Sortierung lässt sich jederzeit pro Ansicht ändern.",
+    stSectionPaths: "Ordner & Pfade",
+    stSectionPathsDesc: "Vault-Ordner, die das Plugin für Bilder und Archivierung nutzt.",
+    stSectionToolbarDesc: "Welche Buttons neben der Suchleiste angezeigt werden. Aktive Buttons verschwinden automatisch aus dem \"+\"-Menü.",
+    stSectionMenuDesc: "Welche Einträge im \"+\"-Menü erscheinen.",
+    stSectionBackup: "Backup",
+    stSectionBackupDesc: "Einstellungen als Datei im Vault sichern — übersteht eine Deinstallation und wird mit dem Vault gesynct.",
+    stExport: "Einstellungen exportieren",
+    stExportDesc: "Speichert alle Einstellungen als visual-explorer-settings.json im Vault-Stammordner.",
+    stExportBtn: "Exportieren",
+    stImport: "Einstellungen importieren",
+    stImportDesc: "Liest visual-explorer-settings.json aus dem Vault und übernimmt die Einstellungen.",
+    stImportBtn: "Importieren",
+    stExported: (path: string) => `Einstellungen exportiert nach ${path}`,
+    stImported: "Einstellungen importiert",
+    stImportNotFound: "Keine Backup-Datei gefunden (visual-explorer-settings.json im Vault-Stammordner).",
+    stImportInvalid: "Backup-Datei konnte nicht gelesen werden (kein gültiges JSON).",
     openSettings: "Einstellungen öffnen",
     openInNewTab: "In neuem Tab öffnen",
     moveNote: "In Ordner verschieben",
@@ -312,7 +330,24 @@ const STRINGS = {
     stSectionSort: "Sorting & views",
     stSectionMenu: "Menu content",
     stMenuItemDesc: "Show this entry in the \"+\" menu. It is hidden automatically while the matching toolbar button is enabled.",
-    stSectionNav: "Navigation & layout",
+    stSectionCardDesc: "How notes and folders are displayed in the list.",
+    stSectionSortDesc: "Defaults for new views — sorting can be changed per view at any time.",
+    stSectionPaths: "Folders & paths",
+    stSectionPathsDesc: "Vault folders the plugin uses for images and archiving.",
+    stSectionToolbarDesc: "Which buttons appear next to the search bar. Active buttons disappear from the \"+\" menu automatically.",
+    stSectionMenuDesc: "Which entries appear in the \"+\" menu.",
+    stSectionBackup: "Backup",
+    stSectionBackupDesc: "Save your settings as a file in the vault — survives uninstalling and syncs with the vault.",
+    stExport: "Export settings",
+    stExportDesc: "Saves all settings as visual-explorer-settings.json in the vault root.",
+    stExportBtn: "Export",
+    stImport: "Import settings",
+    stImportDesc: "Reads visual-explorer-settings.json from the vault and applies the settings.",
+    stImportBtn: "Import",
+    stExported: (path: string) => `Settings exported to ${path}`,
+    stImported: "Settings imported",
+    stImportNotFound: "No backup file found (visual-explorer-settings.json in the vault root).",
+    stImportInvalid: "Could not read the backup file (not valid JSON).",
     openSettings: "Open settings",
     openInNewTab: "Open in new tab",
     moveNote: "Move to folder",
@@ -1980,7 +2015,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(containerEl).setName(s.stSectionCard).setHeading();
+    new Setting(containerEl).setName(s.stSectionCard).setDesc(s.stSectionCardDesc).setHeading();
 
     new Setting(containerEl)
       .setName(s.stListStyle)
@@ -2036,14 +2071,6 @@ class NoteGallerySettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName(s.stSortFavFirst)
-      .setDesc(s.stSortFavFirstDesc)
-      .addToggle(toggle =>
-        toggle.setValue(this.plugin.settings.sortFavoritesFirst)
-          .onChange(async (value) => { this.plugin.settings.sortFavoritesFirst = value; await this.plugin.saveSettings(); })
-      );
-
-    new Setting(containerEl)
       .setName(s.stTitleWrap)
       .setDesc(s.stTitleWrapDesc)
       .addToggle(toggle =>
@@ -2057,6 +2084,14 @@ class NoteGallerySettingTab extends PluginSettingTab {
       .addSlider(slider =>
         slider.setLimits(40, 160, 8).setValue(this.plugin.settings.thumbnailSize)
           .onChange(async (value) => { this.plugin.settings.thumbnailSize = value; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stBreadcrumbSize)
+      .setDesc(s.stBreadcrumbSizeDesc)
+      .addSlider(slider =>
+        slider.setLimits(10, 18, 1).setValue(this.plugin.settings.breadcrumbFontSize)
+          .onChange(async (value) => { this.plugin.settings.breadcrumbFontSize = value; await this.plugin.saveSettings(); })
       );
 
     new Setting(containerEl)
@@ -2080,37 +2115,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
         );
     }
 
-    new Setting(containerEl)
-      .setName(s.stFilesFolder)
-      .setDesc(s.stFilesFolderDesc)
-      .addText(text => {
-        new FolderSuggest(this.app, text.inputEl, async (folder) => {
-          this.plugin.settings.filesFolder = folder.path;
-          await this.plugin.saveSettings();
-        });
-        text.setPlaceholder("Files").setValue(this.plugin.settings.filesFolder)
-          .onChange(async (value) => {
-            this.plugin.settings.filesFolder = value.trim() ? normalizePath(value.trim()) : "";
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(s.stArchiveFolder)
-      .setDesc(s.stArchiveFolderDesc)
-      .addText(text => {
-        new FolderSuggest(this.app, text.inputEl, async (folder) => {
-          this.plugin.settings.archiveFolder = folder.path;
-          await this.plugin.saveSettings();
-        });
-        text.setPlaceholder("Archiv").setValue(this.plugin.settings.archiveFolder)
-          .onChange(async (value) => {
-            this.plugin.settings.archiveFolder = value.trim() ? normalizePath(value.trim()) : "";
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl).setName(s.stSectionSort).setHeading();
+    new Setting(containerEl).setName(s.stSectionSort).setDesc(s.stSectionSortDesc).setHeading();
 
     new Setting(containerEl)
       .setName(s.stDefaultView)
@@ -2145,6 +2150,14 @@ class NoteGallerySettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName(s.stSortFavFirst)
+      .setDesc(s.stSortFavFirstDesc)
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.sortFavoritesFirst)
+          .onChange(async (value) => { this.plugin.settings.sortFavoritesFirst = value; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
       .setName(s.stTitleDateFormat)
       .setDesc(s.stTitleDateFormatDesc)
       .addDropdown(drop => {
@@ -2164,7 +2177,39 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .onChange(async (value) => { this.plugin.settings.recentCount = value; await this.plugin.saveSettings(); })
       );
 
-    new Setting(containerEl).setName(s.stSectionToolbar).setHeading();
+    new Setting(containerEl).setName(s.stSectionPaths).setDesc(s.stSectionPathsDesc).setHeading();
+
+    new Setting(containerEl)
+      .setName(s.stFilesFolder)
+      .setDesc(s.stFilesFolderDesc)
+      .addText(text => {
+        new FolderSuggest(this.app, text.inputEl, async (folder) => {
+          this.plugin.settings.filesFolder = folder.path;
+          await this.plugin.saveSettings();
+        });
+        text.setPlaceholder("Files").setValue(this.plugin.settings.filesFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.filesFolder = value.trim() ? normalizePath(value.trim()) : "";
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(s.stArchiveFolder)
+      .setDesc(s.stArchiveFolderDesc)
+      .addText(text => {
+        new FolderSuggest(this.app, text.inputEl, async (folder) => {
+          this.plugin.settings.archiveFolder = folder.path;
+          await this.plugin.saveSettings();
+        });
+        text.setPlaceholder("Archiv").setValue(this.plugin.settings.archiveFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.archiveFolder = value.trim() ? normalizePath(value.trim()) : "";
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl).setName(s.stSectionToolbar).setDesc(s.stSectionToolbarDesc).setHeading();
 
     type ToolbarToggleKey =
       | "toolbarShowSort" | "toolbarShowViewToggle"
@@ -2195,7 +2240,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
         );
     }
 
-    new Setting(containerEl).setName(s.stSectionMenu).setHeading();
+    new Setting(containerEl).setName(s.stSectionMenu).setDesc(s.stSectionMenuDesc).setHeading();
 
     type MenuToggleKey =
       | "menuShowSort" | "menuShowViewToggle"
@@ -2226,14 +2271,33 @@ class NoteGallerySettingTab extends PluginSettingTab {
         );
     }
 
-    new Setting(containerEl).setName(s.stSectionNav).setHeading();
+    new Setting(containerEl).setName(s.stSectionBackup).setDesc(s.stSectionBackupDesc).setHeading();
 
     new Setting(containerEl)
-      .setName(s.stBreadcrumbSize)
-      .setDesc(s.stBreadcrumbSizeDesc)
-      .addSlider(slider =>
-        slider.setLimits(10, 18, 1).setValue(this.plugin.settings.breadcrumbFontSize)
-          .onChange(async (value) => { this.plugin.settings.breadcrumbFontSize = value; await this.plugin.saveSettings(); })
+      .setName(s.stExport)
+      .setDesc(s.stExportDesc)
+      .addButton(btn =>
+        btn.setButtonText(s.stExportBtn).onClick(async () => {
+          const path = await this.plugin.exportSettings();
+          new Notice(s.stExported(path));
+        })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stImport)
+      .setDesc(s.stImportDesc)
+      .addButton(btn =>
+        btn.setButtonText(s.stImportBtn).onClick(async () => {
+          const result = await this.plugin.importSettings();
+          if (result === "ok") {
+            new Notice(s.stImported);
+            this.display();
+          } else if (result === "missing") {
+            new Notice(s.stImportNotFound);
+          } else {
+            new Notice(s.stImportInvalid);
+          }
+        })
       );
   }
 }
@@ -2322,6 +2386,35 @@ export default class NoteGalleryPlugin extends Plugin {
       state: { folderPath: folder.path },
     });
     await this.app.workspace.revealLeaf(leaf);
+  }
+
+  // The settings backup lives as a JSON file in the vault root: it survives
+  // uninstalling the plugin (which deletes data.json) and syncs with the vault.
+  async exportSettings(): Promise<string> {
+    const path = normalizePath(SETTINGS_BACKUP_FILE);
+    const json = JSON.stringify(this.settings, null, 2);
+    const existing = this.app.vault.getAbstractFileByPath(path);
+    if (existing instanceof TFile) {
+      await this.app.vault.process(existing, () => json);
+    } else {
+      await this.app.vault.create(path, json);
+    }
+    return path;
+  }
+
+  async importSettings(): Promise<"ok" | "missing" | "invalid"> {
+    const file = this.app.vault.getAbstractFileByPath(normalizePath(SETTINGS_BACKUP_FILE));
+    if (!(file instanceof TFile)) return "missing";
+    try {
+      const raw: unknown = JSON.parse(await this.app.vault.read(file));
+      if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return "invalid";
+      this.settings = Object.assign({}, DEFAULT_SETTINGS, raw as Partial<NoteGallerySettings>);
+      this.settings.folderViewModes = { ...(this.settings.folderViewModes ?? {}) };
+      await this.saveSettings();
+      return "ok";
+    } catch {
+      return "invalid";
+    }
   }
 
   async loadSettings() {
