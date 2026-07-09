@@ -34,6 +34,7 @@ interface NoteGallerySettings {
   previewLines: 1 | 2;
   sortFavoritesFirst: boolean;
   openOnStartup: boolean;
+  openLocation: "tab" | "sidebar";
   menuShowSort: boolean;
   menuShowViewToggle: boolean;
   menuShowFavorites: boolean;
@@ -69,6 +70,7 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   previewLines: 1,
   sortFavoritesFirst: false,
   openOnStartup: false,
+  openLocation: "tab",
   menuShowSort: true,
   menuShowViewToggle: true,
   menuShowFavorites: true,
@@ -124,6 +126,10 @@ const STRINGS = {
     error: "Fehler",
     openGallery: "Visual Explorer öffnen",
     openGalleryCommand: "Galerie öffnen",
+    stOpenLocation: "Öffnen in",
+    stOpenLocationDesc: "Wo die Galerie geöffnet wird (Ribbon, Befehl, Ordner-Menü). In der Seitenleiste erscheint sie auf dem Handy im linken Panel.",
+    stOpenLocationTab: "Tab",
+    stOpenLocationSidebar: "Linke Seitenleiste",
     openAsGallery: "Als Galerie öffnen",
     stThumbSize: "Thumbnail-Größe",
     stThumbSizeDesc: "Breite und Höhe des Vorschaubilds in Pixeln",
@@ -231,6 +237,10 @@ const STRINGS = {
     error: "Error",
     openGallery: "Open Visual Explorer",
     openGalleryCommand: "Open gallery",
+    stOpenLocation: "Open in",
+    stOpenLocationDesc: "Where the gallery opens (ribbon, command, folder menu). In the sidebar it shows up in the left panel on mobile.",
+    stOpenLocationTab: "Tab",
+    stOpenLocationSidebar: "Left sidebar",
     openAsGallery: "Open as gallery",
     stThumbSize: "Thumbnail size",
     stThumbSizeDesc: "Width and height of the preview image in pixels",
@@ -1874,6 +1884,19 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .onChange(async (value) => { this.plugin.settings.openOnStartup = value; await this.plugin.saveSettings(); })
       );
 
+    new Setting(containerEl)
+      .setName(s.stOpenLocation)
+      .setDesc(s.stOpenLocationDesc)
+      .addDropdown(drop =>
+        drop.addOption("tab", s.stOpenLocationTab)
+          .addOption("sidebar", s.stOpenLocationSidebar)
+          .setValue(this.plugin.settings.openLocation)
+          .onChange(async (value) => {
+            this.plugin.settings.openLocation = value as NoteGallerySettings["openLocation"];
+            await this.plugin.saveSettings();
+          })
+      );
+
     new Setting(containerEl).setName(s.stSectionCard).setHeading();
 
     new Setting(containerEl)
@@ -2131,12 +2154,7 @@ export default class NoteGalleryPlugin extends Plugin {
           menu.addItem((item) => {
             item.setTitle(STRINGS[this.settings.language].openAsGallery).setIcon("layout-grid")
               .onClick(async () => {
-                const leaf = this.app.workspace.getLeaf(true);
-                await leaf.setViewState({
-                  type: VIEW_TYPE,
-                  active: true,
-                  state: { folderPath: file.path },
-                });
+                await this.openGallery(file);
               });
           });
         }
@@ -2150,23 +2168,42 @@ export default class NoteGalleryPlugin extends Plugin {
     });
   }
 
+  // In tab mode every open action gets its own tab (unchanged behavior).
+  // In sidebar mode a single gallery lives in the left panel and is reused —
+  // on mobile that panel is the slide-in drawer next to the file explorer.
+  private getGalleryLeaf(): WorkspaceLeaf | null {
+    const { workspace } = this.app;
+    if (this.settings.openLocation === "sidebar") {
+      const existing = workspace.getLeavesOfType(VIEW_TYPE)[0];
+      if (existing) return existing;
+      return workspace.getLeftLeaf(false);
+    }
+    return workspace.getLeaf(true);
+  }
+
   async activateView() {
     const { workspace } = this.app;
     let leaf = workspace.getLeavesOfType(VIEW_TYPE)[0];
     if (!leaf) {
-      leaf = workspace.getLeaf(false);
+      const target = this.settings.openLocation === "sidebar"
+        ? workspace.getLeftLeaf(false)
+        : workspace.getLeaf(false);
+      if (!target) return;
+      leaf = target;
       await leaf.setViewState({ type: VIEW_TYPE, active: true });
     }
     await workspace.revealLeaf(leaf);
   }
 
   async openGallery(folder: TFolder) {
-    const leaf = this.app.workspace.getLeaf(true);
+    const leaf = this.getGalleryLeaf();
+    if (!leaf) return;
     await leaf.setViewState({
       type: VIEW_TYPE,
       active: true,
       state: { folderPath: folder.path },
     });
+    await this.app.workspace.revealLeaf(leaf);
   }
 
   async loadSettings() {

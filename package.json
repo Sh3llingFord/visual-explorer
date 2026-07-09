@@ -1,6 +1,6 @@
 {
   "name": "visual-explorer",
-  "version": "1.7.8",
+  "version": "1.8.0",
   "main": "main.js",
   "scripts": {
     "build": "node esbuild.config.mjs",
