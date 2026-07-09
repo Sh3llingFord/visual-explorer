@@ -52,14 +52,14 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
 
 1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat) from the Obsidian Community Plugins browser
 2. Open BRAT settings → **Add Beta Plugin**
-3. Enter: `https://github.com/Sh3llingFord/obsidian-note-gallery`
+3. Enter: `https://github.com/Sh3llingFord/visual-explorer`
 4. Enable the plugin under **Settings → Community Plugins**
 
 ### Manual installation
 
-1. Download `main.js` and `manifest.json` from the [latest release](https://github.com/Sh3llingFord/obsidian-note-gallery/releases/latest)
+1. Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/Sh3llingFord/visual-explorer/releases/latest)
 2. Create a folder `.obsidian/plugins/visual-explorer/` in your vault
-3. Copy both files into that folder
+3. Copy the three files into that folder
 4. Enable the plugin under **Settings → Community Plugins**
 
 ## Usage
@@ -202,8 +202,8 @@ favorite: true
 Requirements: Node.js v18+, npm
 
 ```bash
-git clone https://github.com/Sh3llingFord/obsidian-note-gallery.git
-cd obsidian-note-gallery
+git clone https://github.com/Sh3llingFord/visual-explorer.git
+cd visual-explorer
 npm install --save-dev typescript esbuild obsidian@latest
 node esbuild.config.mjs
 ```
