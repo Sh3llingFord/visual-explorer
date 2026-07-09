@@ -46,6 +46,9 @@ interface NoteGallerySettings {
   coverMode: "off" | "tag" | "always";
   coverTag: string;
   viewMode: "list" | "grid";
+  listStyle: "cards" | "flat";
+  showFolderCounts: boolean;
+  tagChips: "view" | "vault" | "off";
   toolbarShowSort: boolean;
   toolbarShowViewToggle: boolean;
   toolbarShowNewDoc: boolean;
@@ -82,6 +85,9 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   coverMode: "tag",
   coverTag: "vec",
   viewMode: "list",
+  listStyle: "cards",
+  showFolderCounts: true,
+  tagChips: "view",
   toolbarShowSort: false,
   toolbarShowViewToggle: true,
   toolbarShowNewDoc: false,
@@ -126,6 +132,17 @@ const STRINGS = {
     error: "Fehler",
     openGallery: "Visual Explorer öffnen",
     openGalleryCommand: "Galerie öffnen",
+    stListStyle: "Kartenstil",
+    stListStyleDesc: "Karten mit Rahmen und Hintergrund, oder eine kompakte Liste mit Trennlinien",
+    stListStyleCards: "Karten",
+    stListStyleFlat: "Kompakte Liste",
+    stShowFolderCounts: "Dateianzahl bei Ordnern",
+    stShowFolderCountsDesc: "Anzahl der Dateien neben dem Ordnernamen anzeigen",
+    stTagChips: "Tag-Chips",
+    stTagChipsDesc: "Welche Tags als klickbare Chips über der Liste angezeigt werden",
+    stTagChipsView: "Aktuelle Ansicht",
+    stTagChipsVault: "Ganzer Vault",
+    stTagChipsOff: "Aus",
     stOpenLocation: "Öffnen in",
     stOpenLocationDesc: "Wo die Galerie geöffnet wird (Ribbon, Befehl, Ordner-Menü). In der Seitenleiste erscheint sie auf dem Handy im linken Panel.",
     stOpenLocationTab: "Tab",
@@ -237,6 +254,17 @@ const STRINGS = {
     error: "Error",
     openGallery: "Open Visual Explorer",
     openGalleryCommand: "Open gallery",
+    stListStyle: "Card style",
+    stListStyleDesc: "Cards with border and background, or a compact list with separator lines",
+    stListStyleCards: "Cards",
+    stListStyleFlat: "Compact list",
+    stShowFolderCounts: "Folder file count",
+    stShowFolderCountsDesc: "Show the number of files next to the folder name",
+    stTagChips: "Tag chips",
+    stTagChipsDesc: "Which tags are shown as clickable chips above the list",
+    stTagChipsView: "Current view",
+    stTagChipsVault: "Whole vault",
+    stTagChipsOff: "Off",
     stOpenLocation: "Open in",
     stOpenLocationDesc: "Where the gallery opens (ribbon, command, folder menu). In the sidebar it shows up in the left panel on mobile.",
     stOpenLocationTab: "Tab",
@@ -871,8 +899,12 @@ class NoteGalleryView extends ItemView {
     this.buildBreadcrumb(toolbar, s);
     this.buildControlsRow(toolbar, container, s, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
 
-    const allTags = this.collectTagsForCurrentView();
-    if (allTags.length > 0) this.buildTagChips(toolbar, allTags);
+    if (this.plugin.settings.tagChips !== "off") {
+      const allTags = this.plugin.settings.tagChips === "vault"
+        ? this.collectVaultTags()
+        : this.collectTagsForCurrentView();
+      if (allTags.length > 0) this.buildTagChips(toolbar, allTags);
+    }
 
     const listContainer = container.createDiv({ cls: "note-gallery-list" });
     await this.renderList(listContainer, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
@@ -1201,6 +1233,7 @@ class NoteGalleryView extends ItemView {
     const q = this.searchQuery.toLowerCase();
     const isGrid = this.getViewMode() === "grid";
     listContainer.toggleClass("note-gallery-list--grid", isGrid);
+    listContainer.toggleClass("note-gallery-list--flat", this.plugin.settings.listStyle === "flat" && !isGrid);
 
     const setCounter = (text: string) => {
       const existingCounter = this.containerEl.querySelector(".note-gallery-counter");
@@ -1262,11 +1295,14 @@ class NoteGalleryView extends ItemView {
         setIcon(folderIcon, "folder");
       }
       const textDiv = card.createDiv({ cls: "note-gallery-text" });
-      textDiv.createDiv({ cls: "note-gallery-title note-gallery-folder-title", text: subfolder.name });
-      const fileCount = subfolder.children.filter(f => f instanceof TFile).length;
-      const folderCount = subfolder.children.filter(f => f instanceof TFolder).length;
-      const meta = [fileCount + " " + s.files, folderCount > 0 ? folderCount + " " + s.subfolders : ""].filter(Boolean).join(" · ");
-      textDiv.createDiv({ cls: "note-gallery-date", text: meta });
+      const folderTitleRow = textDiv.createDiv({ cls: "note-gallery-title-row" });
+      folderTitleRow.createSpan({ cls: "note-gallery-title note-gallery-folder-title", text: subfolder.name });
+      if (this.plugin.settings.showFolderCounts) {
+        const fileCount = subfolder.children.filter(f => f instanceof TFile).length;
+        const folderCount = subfolder.children.filter(f => f instanceof TFolder).length;
+        const meta = folderCount > 0 ? fileCount + " · " + folderCount : String(fileCount);
+        folderTitleRow.createSpan({ cls: "note-gallery-folder-count", text: meta });
+      }
 
       const openFolderMenu = (e: MouseEvent | TouchEvent) => {
         e.preventDefault();
@@ -1277,6 +1313,17 @@ class NoteGalleryView extends ItemView {
             icon: "file-plus",
             action: async () => {
               await this.createNoteWithName(subfolder.path);
+            }
+          },
+          {
+            label: s.createFolder,
+            icon: "folder-plus",
+            action: () => {
+              new CreateFolderModal(this.app, subfolder.path, s, async (name) => {
+                const path = normalizePath((subfolder.path ? subfolder.path + "/" : "") + name);
+                await this.app.vault.createFolder(path);
+                await this.render();
+              }).open();
             }
           },
           {
@@ -1581,6 +1628,17 @@ class NoteGalleryView extends ItemView {
           }
         },
         {
+          label: s.createFolder,
+          icon: "folder-plus",
+          action: () => {
+            new CreateFolderModal(this.app, this.folder.path, s, async (name) => {
+              const path = normalizePath((this.folder.path ? this.folder.path + "/" : "") + name);
+              await this.app.vault.createFolder(path);
+              await this.render();
+            }).open();
+          }
+        },
+        {
           label: s.openInNewTab,
           icon: "arrow-up-right",
           action: async () => {
@@ -1797,6 +1855,16 @@ class NoteGalleryView extends ItemView {
     return [...allTags].sort();
   }
 
+  private collectVaultTags(): string[] {
+    const allTags = new Set<string>();
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const cache = this.app.metadataCache.getFileCache(file);
+      frontmatterList(cache?.frontmatter, "categories").forEach((c) => allTags.add(String(c)));
+      frontmatterList(cache?.frontmatter, "tags").forEach((t) => allTags.add(String(t)));
+    }
+    return [...allTags].sort();
+  }
+
   private buildTagChips(toolbar: HTMLElement, tags: string[]) {
     const chipsRow = toolbar.createDiv({ cls: "note-gallery-tag-chips" });
     for (const tag of tags) {
@@ -1898,6 +1966,41 @@ class NoteGallerySettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl).setName(s.stSectionCard).setHeading();
+
+    new Setting(containerEl)
+      .setName(s.stListStyle)
+      .setDesc(s.stListStyleDesc)
+      .addDropdown(drop =>
+        drop.addOption("cards", s.stListStyleCards)
+          .addOption("flat", s.stListStyleFlat)
+          .setValue(this.plugin.settings.listStyle)
+          .onChange(async (value) => {
+            this.plugin.settings.listStyle = value as NoteGallerySettings["listStyle"];
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stShowFolderCounts)
+      .setDesc(s.stShowFolderCountsDesc)
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.showFolderCounts)
+          .onChange(async (value) => { this.plugin.settings.showFolderCounts = value; await this.plugin.saveSettings(); })
+      );
+
+    new Setting(containerEl)
+      .setName(s.stTagChips)
+      .setDesc(s.stTagChipsDesc)
+      .addDropdown(drop =>
+        drop.addOption("view", s.stTagChipsView)
+          .addOption("vault", s.stTagChipsVault)
+          .addOption("off", s.stTagChipsOff)
+          .setValue(this.plugin.settings.tagChips)
+          .onChange(async (value) => {
+            this.plugin.settings.tagChips = value as NoteGallerySettings["tagChips"];
+            await this.plugin.saveSettings();
+          })
+      );
 
     new Setting(containerEl)
       .setName(s.stShowPreview)

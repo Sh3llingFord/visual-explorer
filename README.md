@@ -143,6 +143,9 @@ The list/grid toggle remembers the choice **per folder**: switch the photography
 | Date format | de-DE | de-DE / en-US / en-GB |
 | Open on startup | Off | Automatically open Visual Explorer when Obsidian starts |
 | Open in | Tab | Where the gallery opens: a workspace tab, or the left sidebar (shows up in the slide-in panel on mobile) |
+| Card style | Cards | Cards with border and background, or a compact list with separator lines |
+| Folder file count | On | Show the number of files (and subfolders) next to the folder name |
+| Tag chips | Current view | Which tags appear as clickable chips: current view, whole vault, or off |
 | Show preview | On | Show the first lines of note content |
 | Preview lines | 1 | Number of preview text lines (1 or 2) |
 | Favorites first | Off | Show favorited notes at the top of the folder view |
