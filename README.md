@@ -5,16 +5,15 @@ A card-based note browser for Obsidian. Displays notes as a visual list with ima
 ## Features
 
 - **Card view** — each note shows title, category, date, image thumbnail, and optional text preview
-- **Grid view** — toggle between the card list and an image-first grid layout directly in the toolbar; the choice is remembered **per folder** (with a global default in settings)
+- **Three view modes** — cycle between the card list, an image-first grid and a widescreen layout (one full-width 16:9 image per row) directly in the toolbar; the choice is remembered **per folder** (with a global default in settings)
 - **Configurable toolbar buttons** — choose which actions appear next to the search bar: sort, view toggle, new document, create folder, favorites, recently opened, settings
-- **Cover layout** — notes can display a large cover image instead of a small thumbnail (always, or per tag)
 - **Folder navigation** — subfolders always appear at the top as clickable entries with a breadcrumb trail
 - **Live search** — filter notes and folders by title or tag instantly
 - **Search scope toggle** — switch between searching only the current folder or the entire vault; at vault root the scope is always vault-wide
 - **Tag chips** — clickable tag filters appear below the search bar when tags are present in the current view
 - **+ button → action menu:**
   - **Sort** — choose from sort options with the active one highlighted (see below)
-  - View toggle — switch between list and grid
+  - View toggle — cycle between list, grid and widescreen
   - Favorites — shows all notes with `favorite: true` in frontmatter
   - Recently opened — shows the last N modified notes across the vault
   - New document — create a note directly in the current folder
@@ -101,12 +100,12 @@ Select a sort option at the top of the **+** menu — or enable the **sort butto
 | Title date (newest first) | Parses a date at the start of the filename (configurable format) |
 | Title date (oldest first) | |
 
-### Cover layout
-Notes can be displayed with a large cover image spanning the full card width instead of a small thumbnail. This is configured via **Settings → Cover layout**:
+### View modes
+The view toggle cycles through three modes:
 
-- **Off** — standard thumbnail layout for all notes
-- **By tag** — only notes with the configured cover tag use the cover layout
-- **Always** — all notes with an image use the cover layout
+- **List** — cards (or compact rows) with title, date, category, preview and thumbnail
+- **Grid** — square image tiles, two or more per row depending on width
+- **Widescreen** — one note per row with a full-width 16:9 image
 
 ### Actions via + button
 - **Favorites** — shows all favorited notes
@@ -115,10 +114,10 @@ Notes can be displayed with a large cover image spanning the full card width ins
 - **Create folder** — creates a new subfolder
 
 ### Toolbar buttons
-The buttons between the search bar and the + button are configurable via **Settings → Toolbar**. Available actions: Sort, View toggle (list/grid), New document, Create folder, Favorites, Recently opened, Open settings. By default only the view toggle is enabled.
+The buttons between the search bar and the + button are configurable via **Settings → Toolbar**. Available actions: Sort, View toggle (list/grid/widescreen), New document, Create folder, Favorites, Recently opened, Open settings. By default only the view toggle is enabled.
 
 ### Per-folder view memory
-The list/grid toggle remembers the choice **per folder**: switch the photography folder to grid and it stays grid, while other folders keep their own view. Folders without an explicit choice use the **Default view** from settings. In the Favorites and Recently opened views the toggle changes the global default.
+The view toggle remembers the choice **per folder**: switch the photography folder to grid and it stays grid, while other folders keep their own view. Folders without an explicit choice use the **Default view** from settings. In the Favorites and Recently opened views the toggle changes the global default.
 
 ### Actions via long-press / right-click on a note
 - **Add / remove favorite** — sets `favorite: true` in frontmatter
@@ -151,11 +150,10 @@ The list/grid toggle remembers the choice **per folder**: switch the photography
 | Favorites first | Off | Show favorited notes at the top of the folder view |
 | Wrap title | Off | Allow long titles to wrap instead of being truncated |
 | Thumbnail size | 72px | Width and height of the image preview (40–160px) |
-| Cover layout | By tag | Off / By tag / Always |
-| Cover tag | `vec` | Tag that triggers the cover layout (only relevant for "By tag") |
 | Files folder | `Files` | Path to the folder containing images, relative to vault root |
 | Archive folder | `Archiv` | Destination folder for the Archive action, relative to vault root |
-| Default view | List | View for folders without their own list/grid choice |
+| Default view | List | List / Grid / Widescreen — for folders without their own choice |
+| Open favorites & recent in | Current view | Whether favorites/recent replace the current view or open in a new tab |
 | Default sort | Modified (newest first) | Default sort for new views |
 | Title date format | dd.mm.yyyy | Date format parsed from the start of filenames for "Title date" sort |
 | Recent count | 30 | How many notes to show in "Recently opened" (5–100) |

@@ -45,9 +45,8 @@ interface NoteGallerySettings {
   menuShowCreateFolder: boolean;
   menuShowOpenSettings: boolean;
   archiveFolder: string;
-  coverMode: "off" | "tag" | "always";
-  coverTag: string;
-  viewMode: "list" | "grid";
+  viewMode: "list" | "grid" | "wide";
+  modeViewOpen: "inplace" | "tab";
   listStyle: "cards" | "flat";
   showFolderCounts: boolean;
   tagChips: "view" | "vault" | "off";
@@ -58,7 +57,7 @@ interface NoteGallerySettings {
   toolbarShowFavorites: boolean;
   toolbarShowRecent: boolean;
   toolbarShowOpenSettings: boolean;
-  folderViewModes: Record<string, "list" | "grid">;
+  folderViewModes: Record<string, "list" | "grid" | "wide">;
 }
 
 const DEFAULT_SETTINGS: NoteGallerySettings = {
@@ -84,9 +83,8 @@ const DEFAULT_SETTINGS: NoteGallerySettings = {
   menuShowCreateFolder: true,
   menuShowOpenSettings: true,
   archiveFolder: "Archiv",
-  coverMode: "tag",
-  coverTag: "vec",
   viewMode: "list",
+  modeViewOpen: "inplace",
   listStyle: "cards",
   showFolderCounts: true,
   tagChips: "view",
@@ -149,6 +147,10 @@ const STRINGS = {
     stOpenLocationDesc: "Wo die Galerie geöffnet wird (Ribbon, Befehl, Ordner-Menü). In der Seitenleiste erscheint sie auf dem Handy im linken Panel.",
     stOpenLocationTab: "Tab",
     stOpenLocationSidebar: "Linke Seitenleiste",
+    stModeViewOpen: "Favoriten & Zuletzt geöffnet öffnen in",
+    stModeViewOpenDesc: "Ob die Favoriten- und Zuletzt-geöffnet-Ansicht die aktuelle Ansicht ersetzt oder in einem neuen Tab öffnet.",
+    stModeViewOpenInplace: "Aktueller Ansicht",
+    stModeViewOpenTab: "Neuem Tab",
     openAsGallery: "Als Galerie öffnen",
     stThumbSize: "Thumbnail-Größe",
     stThumbSizeDesc: "Breite und Höhe des Vorschaubilds in Pixeln",
@@ -221,23 +223,18 @@ const STRINGS = {
     archiveFolderNotSet: "Kein Archiv-Ordner konfiguriert. Bitte in den Einstellungen festlegen.",
     stArchiveFolder: "Archiv-Ordner",
     stArchiveFolderDesc: "Pfad des Ordners, in den Notizen per Kontextmenü archiviert werden (relativ zum Vault-Root)",
-    stCoverMode: "Cover-Layout",
-    stCoverModeDesc: "Großes Titelbild statt kleinem Thumbnail",
-    stCoverModeOff: "Aus",
-    stCoverModeTag: "Per Tag",
-    stCoverModeAlways: "Immer",
-    stCoverTag: "Cover-Tag",
-    stCoverTagDesc: "Notizen mit diesem Tag erhalten das Cover-Layout (nur bei \"Per Tag\")",
     searchVaultTooltip: "Im ganzen Vault suchen",
     searchFolderTooltip: "Nur im aktuellen Ordner suchen",
     viewAsList: "Als Liste anzeigen",
     viewAsGrid: "Als Raster anzeigen",
+    viewAsWide: "Als Breitbild anzeigen",
     stSectionToolbar: "Toolbar",
     stToolbarItemDesc: "Diesen Button in der Toolbar anzeigen. Solange er aktiv ist, wird der passende Eintrag im \"+\"-Menü automatisch ausgeblendet.",
     stDefaultView: "Standard-Ansicht",
     stDefaultViewDesc: "Ansicht für Ordner ohne eigene Wahl. Der Toolbar-Umschalter merkt sich die Ansicht pro Ordner.",
     stViewList: "Liste",
     stViewGrid: "Raster",
+    stViewWide: "Breitbild",
     stViewToggle: "Ansicht umschalten (Liste/Raster)",
   },
   en: {
@@ -288,6 +285,10 @@ const STRINGS = {
     stOpenLocationDesc: "Where the gallery opens (ribbon, command, folder menu). In the sidebar it shows up in the left panel on mobile.",
     stOpenLocationTab: "Tab",
     stOpenLocationSidebar: "Left sidebar",
+    stModeViewOpen: "Open favorites & recent in",
+    stModeViewOpenDesc: "Whether the favorites and recently-opened views replace the current view or open in a new tab.",
+    stModeViewOpenInplace: "Current view",
+    stModeViewOpenTab: "New tab",
     openAsGallery: "Open as gallery",
     stThumbSize: "Thumbnail size",
     stThumbSizeDesc: "Width and height of the preview image in pixels",
@@ -360,23 +361,18 @@ const STRINGS = {
     archiveFolderNotSet: "No archive folder configured. Please set one in the plugin settings.",
     stArchiveFolder: "Archive folder",
     stArchiveFolderDesc: "Path of the folder notes are moved to when archived via the context menu (relative to vault root)",
-    stCoverMode: "Cover layout",
-    stCoverModeDesc: "Large cover image instead of a small thumbnail",
-    stCoverModeOff: "Off",
-    stCoverModeTag: "By tag",
-    stCoverModeAlways: "Always",
-    stCoverTag: "Cover tag",
-    stCoverTagDesc: "Notes with this tag use the cover layout (only with \"By tag\")",
     searchVaultTooltip: "Search the whole vault",
     searchFolderTooltip: "Search the current folder only",
     viewAsList: "Show as list",
     viewAsGrid: "Show as grid",
+    viewAsWide: "Show as widescreen",
     stSectionToolbar: "Toolbar",
     stToolbarItemDesc: "Show this button in the toolbar. While it is enabled, the matching entry in the \"+\" menu is hidden automatically.",
     stDefaultView: "Default view",
     stDefaultViewDesc: "View for folders without their own choice. The toolbar toggle remembers the view per folder.",
     stViewList: "List",
     stViewGrid: "Grid",
+    stViewWide: "Widescreen",
     stViewToggle: "Toggle view (list/grid)",
   },
 };
@@ -794,7 +790,7 @@ class NoteGalleryView extends ItemView {
   getIcon() { return "layout-grid"; }
 
   getState(): Record<string, unknown> {
-    return { folderPath: this.folder?.path ?? this.folderPath };
+    return { folderPath: this.folder?.path ?? this.folderPath, mode: this.mode };
   }
 
   async setState(state: Record<string, unknown>, result: { history: boolean }): Promise<void> {
@@ -809,7 +805,8 @@ class NoteGalleryView extends ItemView {
         this.breadcrumb = this.computeBreadcrumb(found);
       }
     }
-    this.mode = "folder";
+    const mode = state?.mode;
+    this.mode = mode === "recent" || mode === "favorites" ? mode : "folder";
     this.searchQuery = "";
     this.searchVaultWide = false;
     this.load();
@@ -1084,8 +1081,10 @@ class NoteGalleryView extends ItemView {
     }
 
     if (ts.toolbarShowViewToggle) {
-      const isGrid = this.getViewMode() === "grid";
-      makeToolbarBtn(isGrid ? "list" : "layout-grid", isGrid ? s.viewAsList : s.viewAsGrid, () => this.toggleViewMode());
+      const mode = this.getViewMode();
+      const nextIcon = mode === "list" ? "layout-grid" : mode === "grid" ? "rectangle-horizontal" : "list";
+      const nextLabel = mode === "list" ? s.viewAsGrid : mode === "grid" ? s.viewAsWide : s.viewAsList;
+      makeToolbarBtn(nextIcon, nextLabel, () => this.toggleViewMode());
     }
 
     if (ts.toolbarShowNewDoc) {
@@ -1106,13 +1105,13 @@ class NoteGalleryView extends ItemView {
 
     if (ts.toolbarShowFavorites) {
       makeToolbarBtn("star", s.favorites, () => {
-        this.mode = "favorites"; this.searchQuery = ""; void this.render();
+        this.openModeView("favorites");
       });
     }
 
     if (ts.toolbarShowRecent) {
       makeToolbarBtn("clock", s.recent, () => {
-        this.mode = "recent"; this.searchQuery = ""; void this.render();
+        this.openModeView("recent");
       });
     }
 
@@ -1147,9 +1146,10 @@ class NoteGalleryView extends ItemView {
       }
 
       if (inMenu(ms.menuShowViewToggle, ms.toolbarShowViewToggle)) {
-        const isGrid = this.getViewMode() === "grid";
+        const mode = this.getViewMode();
+        const nextLabel = mode === "list" ? s.viewAsGrid : mode === "grid" ? s.viewAsWide : s.viewAsList;
         addGroup(() => menu.addItem(item => {
-          item.setTitle(isGrid ? s.viewAsList : s.viewAsGrid).setIcon(isGrid ? "list" : "layout-grid");
+          item.setTitle(nextLabel).setIcon(mode === "list" ? "layout-grid" : mode === "grid" ? "rectangle-horizontal" : "list");
           item.onClick(() => this.toggleViewMode());
         }));
       }
@@ -1157,11 +1157,11 @@ class NoteGalleryView extends ItemView {
       const navBuilders: (() => void)[] = [];
       if (inMenu(ms.menuShowFavorites, ms.toolbarShowFavorites)) navBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.favorites).setIcon("star");
-        item.onClick(() => { this.mode = "favorites"; this.searchQuery = ""; void this.render(); });
+        item.onClick(() => { this.openModeView("favorites"); });
       }));
       if (inMenu(ms.menuShowRecent, ms.toolbarShowRecent)) navBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.recent).setIcon("clock");
-        item.onClick(() => { this.mode = "recent"; this.searchQuery = ""; void this.render(); });
+        item.onClick(() => { this.openModeView("recent"); });
       }));
       if (navBuilders.length) addGroup(() => navBuilders.forEach(b => b()));
 
@@ -1196,8 +1196,23 @@ class NoteGalleryView extends ItemView {
     });
   }
 
+  private openModeView(mode: "recent" | "favorites") {
+    if (this.plugin.settings.modeViewOpen === "tab") {
+      void this.app.workspace.getLeaf("tab").setViewState({
+        type: VIEW_TYPE,
+        active: true,
+        state: { folderPath: this.folder?.path ?? "", mode },
+      });
+      return;
+    }
+    this.mode = mode;
+    this.searchQuery = "";
+    void this.render();
+  }
+
   private async toggleViewMode() {
-    const next = this.getViewMode() === "grid" ? "list" : "grid";
+    const order = ["list", "grid", "wide"] as const;
+    const next = order[(order.indexOf(this.getViewMode()) + 1) % order.length];
     if (this.mode === "folder") this.plugin.settings.folderViewModes[this.folder.path] = next;
     else this.plugin.settings.viewMode = next;
     await this.plugin.saveSettings();
@@ -1206,7 +1221,7 @@ class NoteGalleryView extends ItemView {
 
   // Per-folder view choice (exact path match); global viewMode is the
   // fallback and the value used by the recent/favorites modes.
-  private getViewMode(): "list" | "grid" {
+  private getViewMode(): "list" | "grid" | "wide" {
     if (this.mode === "folder" && this.folder) {
       return this.plugin.settings.folderViewModes[this.folder.path] ?? this.plugin.settings.viewMode;
     }
@@ -1282,8 +1297,10 @@ class NoteGalleryView extends ItemView {
     const { language, recentCount } = this.plugin.settings;
     const s = STRINGS[language];
     const q = this.searchQuery.toLowerCase();
-    const isGrid = this.getViewMode() === "grid";
+    const viewMode = this.getViewMode();
+    const isGrid = viewMode !== "list";
     listContainer.toggleClass("note-gallery-list--grid", isGrid);
+    listContainer.toggleClass("note-gallery-list--wide", viewMode === "wide");
     listContainer.toggleClass("note-gallery-list--flat", this.plugin.settings.listStyle === "flat" && !isGrid);
 
     const setCounter = (text: string) => {
@@ -1548,16 +1565,9 @@ class NoteGalleryView extends ItemView {
     const category = extractCategories(frontmatter);
     const dateStr = formatDate(frontmatter, file, dateLocale);
     const favorite = isFavorite(frontmatter);
-    const { coverMode, coverTag } = this.plugin.settings;
-    const isGrid = this.getViewMode() === "grid";
-    const coverTags: string[] = Array.isArray(frontmatter?.tags) ? (frontmatter.tags as unknown[]).map(String) : [];
-    // Grid tiles already show a large image, so the cover layout only applies in list view.
-    const isCoverMode = !isGrid && (
-      coverMode === "always" ||
-      (coverMode === "tag" && coverTag.trim() !== "" && coverTags.includes(coverTag.trim())));
+    const isGrid = this.getViewMode() !== "list";
 
     const card = listContainer.createDiv({ cls: "note-gallery-card" });
-    if (isCoverMode) card.addClass("note-gallery-card--cover");
     if (isGrid) card.addClass("note-gallery-card--grid");
 
     // Drag: allow note to be dragged onto a folder card
@@ -1579,7 +1589,7 @@ class NoteGalleryView extends ItemView {
     if (favorite) titleRow.createSpan({ cls: "note-gallery-favorite-star", text: "★ " });
     const titleEl = titleRow.createSpan({ cls: "note-gallery-title" });
     titleEl.setText(file.basename);
-    if (titleWrap && !isCoverMode && !isGrid) titleEl.addClass("note-gallery-title--wrap");
+    if (titleWrap && !isGrid) titleEl.addClass("note-gallery-title--wrap");
 
     const metaDiv = textDiv.createDiv({ cls: "note-gallery-meta" });
     if (category) {
@@ -1622,21 +1632,12 @@ class NoteGalleryView extends ItemView {
       }
     } else if (imgFile) {
       const url = this.app.vault.getResourcePath(imgFile);
-      if (isCoverMode) {
-        const coverDiv = card.createDiv({ cls: "note-gallery-cover-img" });
-        const img = coverDiv.createEl("img");
-        img.loading = "lazy";
-        img.decoding = "async";
-        img.src = url;
-        img.alt = file.basename;
-      } else {
-        const imgDiv = card.createDiv({ cls: "note-gallery-thumb" });
-        const img = imgDiv.createEl("img");
-        img.loading = "lazy";
-        img.decoding = "async";
-        img.src = url;
-        img.alt = file.basename;
-      }
+      const imgDiv = card.createDiv({ cls: "note-gallery-thumb" });
+      const img = imgDiv.createEl("img");
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.src = url;
+      img.alt = file.basename;
     }
 
     // Long-press (mobile) / right-click (desktop) → context menu
@@ -1772,7 +1773,7 @@ class NoteGalleryView extends ItemView {
       hour: "2-digit", minute: "2-digit",
     });
 
-    const isGrid = this.getViewMode() === "grid";
+    const isGrid = this.getViewMode() !== "list";
     const card = listContainer.createDiv({ cls: "note-gallery-card" });
     if (isGrid) card.addClass("note-gallery-card--grid");
 
@@ -2016,6 +2017,19 @@ class NoteGallerySettingTab extends PluginSettingTab {
           })
       );
 
+    new Setting(containerEl)
+      .setName(s.stModeViewOpen)
+      .setDesc(s.stModeViewOpenDesc)
+      .addDropdown(drop =>
+        drop.addOption("inplace", s.stModeViewOpenInplace)
+          .addOption("tab", s.stModeViewOpenTab)
+          .setValue(this.plugin.settings.modeViewOpen)
+          .onChange(async (value) => {
+            this.plugin.settings.modeViewOpen = value as NoteGallerySettings["modeViewOpen"];
+            await this.plugin.saveSettings();
+          })
+      );
+
     new Setting(containerEl).setName(s.stSectionCard).setDesc(s.stSectionCardDesc).setHeading();
 
     new Setting(containerEl)
@@ -2095,27 +2109,6 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .onChange(async (value) => { this.plugin.settings.breadcrumbFontSize = value; await this.plugin.saveSettings(); })
       );
 
-    new Setting(containerEl)
-      .setName(s.stCoverMode)
-      .setDesc(s.stCoverModeDesc)
-      .addDropdown(drop =>
-        drop.addOption("off", s.stCoverModeOff)
-          .addOption("tag", s.stCoverModeTag)
-          .addOption("always", s.stCoverModeAlways)
-          .setValue(this.plugin.settings.coverMode)
-          .onChange(async (value) => { this.plugin.settings.coverMode = value as NoteGallerySettings["coverMode"]; await this.plugin.saveSettings(); this.display(); })
-      );
-
-    if (this.plugin.settings.coverMode === "tag") {
-      new Setting(containerEl)
-        .setName(s.stCoverTag)
-        .setDesc(s.stCoverTagDesc)
-        .addText(text =>
-          text.setPlaceholder("vec").setValue(this.plugin.settings.coverTag)
-            .onChange(async (value) => { this.plugin.settings.coverTag = value.trim(); await this.plugin.saveSettings(); })
-        );
-    }
-
     new Setting(containerEl).setName(s.stSectionSort).setDesc(s.stSectionSortDesc).setHeading();
 
     new Setting(containerEl)
@@ -2124,6 +2117,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
       .addDropdown(drop =>
         drop.addOption("list", s.stViewList)
           .addOption("grid", s.stViewGrid)
+          .addOption("wide", s.stViewWide)
           .setValue(this.plugin.settings.viewMode)
           .onChange(async (value) => {
             this.plugin.settings.viewMode = value as NoteGallerySettings["viewMode"];
