@@ -3,7 +3,7 @@
 A card-based note browser for Obsidian. Displays notes as a visual list or gallery with image thumbnails, category tags, dates, and a text preview — making it easy to browse and navigate your vault. Can run as a workspace tab or docked in the sidebar like the native file explorer.
 
 <img width="500" height="282" alt="Bildschirmfoto 2026-07-09 um 20 47 50" src="https://github.com/user-attachments/assets/f49bf721-56d1-4c1e-8714-15b79d2ce8a0" />  
-< br >
+(< br >)
 <img width="500" height="282" alt="Bildschirmfoto 2026-07-09 um 20 48 05" src="https://github.com/user-attachments/assets/b35b1678-2b96-4f84-bc7e-d9d2fc4de9bf" />  
 < br >
 <img width="500" height="282" alt="Bildschirmfoto 2026-07-09 um 20 48 17" src="https://github.com/user-attachments/assets/d38e89f8-1dd0-4250-ab6a-78ebd076400f" />
