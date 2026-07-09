@@ -13,6 +13,7 @@ import {
   AbstractInputSuggest,
   debounce,
   normalizePath,
+  Platform,
   setIcon,
 } from "obsidian";
 
@@ -1560,7 +1561,7 @@ class NoteGalleryView extends ItemView {
     if (isGrid) card.addClass("note-gallery-card--grid");
 
     // Drag: allow note to be dragged onto a folder card
-    card.draggable = true;
+    card.draggable = !Platform.isMobile;
     card.addEventListener("dragstart", (e) => {
       e.dataTransfer?.setData("text/plain", file.path);
       card.addClass("note-gallery-card--dragging");
@@ -1776,7 +1777,7 @@ class NoteGalleryView extends ItemView {
     if (isGrid) card.addClass("note-gallery-card--grid");
 
     // Drag: allow file to be dragged onto a folder card
-    card.draggable = true;
+    card.draggable = !Platform.isMobile;
     card.addEventListener("dragstart", (e) => {
       e.dataTransfer?.setData("text/plain", file.path);
       card.addClass("note-gallery-card--dragging");
