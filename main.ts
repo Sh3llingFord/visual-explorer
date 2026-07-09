@@ -163,7 +163,6 @@ const STRINGS = {
     stSortFavFirstDesc: "Favoriten werden in der Ordneransicht oben angezeigt",
     stOpenOnStartup: "Beim Start öffnen",
     stOpenOnStartupDesc: "Visual Explorer automatisch beim Start von Obsidian öffnen",
-    stSectionGeneral: "Allgemein",
     stSectionCard: "Kartenanzeige",
     stSectionSort: "Sortierung & Ansichten",
     stSectionMenu: "Menü-Inhalt",
@@ -271,12 +270,11 @@ const STRINGS = {
     stSortFavFirstDesc: "Show favorites at the top of the folder view",
     stOpenOnStartup: "Open on startup",
     stOpenOnStartupDesc: "Automatically open Visual Explorer when Obsidian starts",
-    stSectionGeneral: "General",
-    stSectionCard: "Card Display",
-    stSectionSort: "Sorting & Views",
+    stSectionCard: "Card display",
+    stSectionSort: "Sorting & views",
     stSectionMenu: "Menu content",
     stMenuItemDesc: "Show this entry in the \"+\" menu. It is hidden automatically while the matching toolbar button is enabled.",
-    stSectionNav: "Navigation & Layout",
+    stSectionNav: "Navigation & layout",
     openSettings: "Open settings",
     openInNewTab: "Open in new tab",
     moveNote: "Move to folder",
@@ -408,7 +406,7 @@ class ConfirmDeleteModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.s.deleteTitle });
+    this.titleEl.setText(this.s.deleteTitle);
     contentEl.createEl("p", { text: this.s.deleteConfirm(this.fileName) });
     const btnRow = contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
     const cancelBtn = btnRow.createEl("button", { text: this.s.cancel });
@@ -434,7 +432,7 @@ class RenameModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.s.renameTitle });
+    this.titleEl.setText(this.s.renameTitle);
     const input = contentEl.createEl("input", { type: "text", cls: "note-gallery-rename-input" });
     input.value = this.file.basename;
     input.select();
@@ -472,7 +470,7 @@ class CreateFolderModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.s.createFolderTitle });
+    this.titleEl.setText(this.s.createFolderTitle);
     const input = contentEl.createEl("input", { type: "text", cls: "note-gallery-rename-input", placeholder: this.s.createFolderPlaceholder });
     input.focus();
     const btnRow = contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
@@ -507,7 +505,7 @@ class RenameFolderModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.s.renameFolder });
+    this.titleEl.setText(this.s.renameFolder);
     const input = contentEl.createEl("input", { type: "text", cls: "note-gallery-rename-input" });
     input.value = this.folder.name;
     input.select();
@@ -543,7 +541,7 @@ class ConfirmDeleteFolderModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.s.deleteFolderTitle });
+    this.titleEl.setText(this.s.deleteFolderTitle);
     contentEl.createEl("p", { text: this.s.deleteFolderConfirm(this.folderName) });
     const btnRow = contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
     btnRow.createEl("button", { text: this.s.cancel }).addEventListener("click", () => this.close());
@@ -568,7 +566,7 @@ class MoveFolderModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.s.moveNoteTitle });
+    this.titleEl.setText(this.s.moveNoteTitle);
 
     const searchInput = contentEl.createEl("input", {
       type: "text",
@@ -1824,11 +1822,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     const s = STRINGS[this.plugin.settings.language];
-    containerEl.createEl("h2", { text: "Visual Explorer" });
-
-    // ── Allgemein / General ────────────────────────────────────────
-    containerEl.createEl("h3", { text: s.stSectionGeneral, cls: "note-gallery-settings-section" });
-
+    // General settings stay at the top without a heading
     new Setting(containerEl)
       .setName("Sprache / Language")
       .setDesc("Sprache der Benutzeroberfläche / UI language")
@@ -1858,8 +1852,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .onChange(async (value) => { this.plugin.settings.openOnStartup = value; await this.plugin.saveSettings(); })
       );
 
-    // ── Kartenanzeige / Card Display ──────────────────────────────
-    containerEl.createEl("h3", { text: s.stSectionCard, cls: "note-gallery-settings-section" });
+    new Setting(containerEl).setName(s.stSectionCard).setHeading();
 
     new Setting(containerEl)
       .setName(s.stShowPreview)
@@ -1954,8 +1947,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
           });
       });
 
-    // ── Sortierung & Ansichten / Sorting & Views ──────────────────
-    containerEl.createEl("h3", { text: s.stSectionSort, cls: "note-gallery-settings-section" });
+    new Setting(containerEl).setName(s.stSectionSort).setHeading();
 
     new Setting(containerEl)
       .setName(s.stDefaultView)
@@ -2009,8 +2001,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
           .onChange(async (value) => { this.plugin.settings.recentCount = value; await this.plugin.saveSettings(); })
       );
 
-    // ── Toolbar ────────────────────────────────────────────────────
-    containerEl.createEl("h3", { text: s.stSectionToolbar, cls: "note-gallery-settings-section" });
+    new Setting(containerEl).setName(s.stSectionToolbar).setHeading();
 
     type ToolbarToggleKey =
       | "toolbarShowSort" | "toolbarShowViewToggle"
@@ -2041,8 +2032,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
         );
     }
 
-    // ── Menü-Inhalt / Menu content ─────────────────────────────────
-    containerEl.createEl("h3", { text: s.stSectionMenu, cls: "note-gallery-settings-section" });
+    new Setting(containerEl).setName(s.stSectionMenu).setHeading();
 
     type MenuToggleKey =
       | "menuShowSort" | "menuShowViewToggle"
@@ -2073,8 +2063,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
         );
     }
 
-    // ── Navigation & Layout ───────────────────────────────────────
-    containerEl.createEl("h3", { text: s.stSectionNav, cls: "note-gallery-settings-section" });
+    new Setting(containerEl).setName(s.stSectionNav).setHeading();
 
     new Setting(containerEl)
       .setName(s.stBreadcrumbSize)
