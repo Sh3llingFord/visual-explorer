@@ -343,9 +343,10 @@
   gap: 5px;
   padding-bottom: 2px;
   overflow-x: auto;
-  scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
+/* Obsidian only runs on Chromium/WebKit, so the -webkit rule covers all
+   platforms without the partially-supported scrollbar-width property. */
 .note-gallery-tag-chips::-webkit-scrollbar { display: none; }
 .note-gallery-tag-chip {
   font-size: 11px;
@@ -416,8 +417,10 @@
   object-fit: cover;
 }
 
-.note-gallery-card--drag-over {
-  background: var(--interactive-accent) !important;
+/* Doubled class beats the base and :hover rules by specificity/order,
+   no !important needed. */
+.note-gallery-card.note-gallery-card--drag-over {
+  background: var(--interactive-accent);
   outline: 2px solid var(--interactive-accent-hover);
 }
 .note-gallery-card--drag-over .note-gallery-title,

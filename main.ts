@@ -311,6 +311,50 @@ const STRINGS = {
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
 
+// WorkspaceLeaf.history and App.setting are not part of the public API.
+// They are typed here and accessed defensively, so an internal change in
+// Obsidian degrades gracefully instead of crashing.
+interface LeafHistoryEntry {
+  state: { type: string; state: { folderPath: string }; active: boolean };
+  eState: null;
+}
+interface LeafNavigationHistory {
+  backHistory?: LeafHistoryEntry[];
+  forwardHistory?: LeafHistoryEntry[];
+}
+
+// setViewState({active:true}) on an already-active leaf does not record
+// history. Push the current state manually so the back button works.
+function pushLeafHistory(leaf: WorkspaceLeaf, folderPath: string) {
+  const history = (leaf as WorkspaceLeaf & { history?: LeafNavigationHistory }).history;
+  if (history == null) return;
+  if (!history.backHistory) history.backHistory = [];
+  history.backHistory.push({
+    state: { type: VIEW_TYPE, state: { folderPath }, active: true },
+    eState: null,
+  });
+  history.forwardHistory = [];
+}
+
+function frontmatterList(frontmatter: unknown, key: string): unknown[] {
+  if (frontmatter == null || typeof frontmatter !== "object") return [];
+  const value = (frontmatter as Record<string, unknown>)[key];
+  return Array.isArray(value) ? (value as unknown[]) : [];
+}
+
+interface AppSettingDialog {
+  setting?: {
+    open(): void;
+    openTabById(id: string): void;
+  };
+}
+
+function openPluginSettings(app: App) {
+  const setting = (app as App & AppSettingDialog).setting;
+  setting?.open();
+  setting?.openTabById("visual-explorer");
+}
+
 function extractFirstImage(content: string): string | null {
   const wikiMatch = content.match(/!\[\[([^\]]+\.(png|jpg|jpeg|gif|webp))[^\]]*\]\]/i);
   if (wikiMatch) return wikiMatch[1];
@@ -337,17 +381,17 @@ function extractPreviewText(content: string): string {
 
 function extractCategories(frontmatter: Record<string, unknown>): string {
   const cats = frontmatter?.categories;
-  if (Array.isArray(cats) && cats.length > 0) return cats.map((c: unknown) => "#" + c).join(" · ");
+  if (Array.isArray(cats) && cats.length > 0) return cats.map((c: unknown) => "#" + String(c)).join(" · ");
   const tags = frontmatter?.tags;
-  if (Array.isArray(tags) && tags.length > 0) return tags.map((t: unknown) => "#" + t).join(" · ");
+  if (Array.isArray(tags) && tags.length > 0) return tags.map((t: unknown) => "#" + String(t)).join(" · ");
   return "";
 }
 
 function getEffectiveCreatedTime(file: TFile, app: App): number {
-  const raw = app.metadataCache.getFileCache(file)?.frontmatter;
-  const val = raw?.date || raw?.created;
-  if (val) {
-    const d = new Date(String(val));
+  const raw: Record<string, unknown> | undefined = app.metadataCache.getFileCache(file)?.frontmatter;
+  const val = raw?.date ?? raw?.created;
+  if (typeof val === "string" || typeof val === "number") {
+    const d = new Date(val);
     if (!isNaN(d.getTime())) return d.getTime();
   }
   return file.stat.ctime;
@@ -376,9 +420,9 @@ function getTitleDateTime(file: TFile, format: TitleDateFormat): number | null {
 }
 
 function formatDate(frontmatter: Record<string, unknown>, file: TFile, locale: string): string {
-  const raw = frontmatter?.date || frontmatter?.created;
-  if (raw) {
-    const d = new Date(String(raw));
+  const raw = frontmatter?.date ?? frontmatter?.created;
+  if (typeof raw === "string" || typeof raw === "number") {
+    const d = new Date(raw);
     if (!isNaN(d.getTime())) {
       return d.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
     }
@@ -394,10 +438,10 @@ function isFavorite(frontmatter: Record<string, unknown>): boolean {
 
 class ConfirmDeleteModal extends Modal {
   private fileName: string;
-  private onConfirm: () => void;
+  private onConfirm: () => void | Promise<void>;
   private s: typeof STRINGS["de"];
 
-  constructor(app: App, fileName: string, s: typeof STRINGS["de"], onConfirm: () => void) {
+  constructor(app: App, fileName: string, s: typeof STRINGS["de"], onConfirm: () => void | Promise<void>) {
     super(app);
     this.fileName = fileName;
     this.onConfirm = onConfirm;
@@ -412,7 +456,7 @@ class ConfirmDeleteModal extends Modal {
     const cancelBtn = btnRow.createEl("button", { text: this.s.cancel });
     cancelBtn.addEventListener("click", () => this.close());
     const deleteBtn = btnRow.createEl("button", { text: this.s.delete, cls: "mod-warning" });
-    deleteBtn.addEventListener("click", () => { this.onConfirm(); this.close(); });
+    deleteBtn.addEventListener("click", () => { void this.onConfirm(); this.close(); });
   }
 
   onClose() { this.contentEl.empty(); }
@@ -420,10 +464,10 @@ class ConfirmDeleteModal extends Modal {
 
 class RenameModal extends Modal {
   private file: TFile;
-  private onConfirm: (newName: string) => void;
+  private onConfirm: (newName: string) => void | Promise<void>;
   private s: typeof STRINGS["de"];
 
-  constructor(app: App, file: TFile, s: typeof STRINGS["de"], onConfirm: (newName: string) => void) {
+  constructor(app: App, file: TFile, s: typeof STRINGS["de"], onConfirm: (newName: string) => void | Promise<void>) {
     super(app);
     this.file = file;
     this.onConfirm = onConfirm;
@@ -443,7 +487,7 @@ class RenameModal extends Modal {
     confirmBtn.addEventListener("click", () => {
       const newName = input.value.trim();
       if (newName && newName !== this.file.basename) {
-        this.onConfirm(newName);
+        void this.onConfirm(newName);
       }
       this.close();
     });
@@ -458,10 +502,10 @@ class RenameModal extends Modal {
 
 class CreateFolderModal extends Modal {
   private parentPath: string;
-  private onConfirm: (name: string) => void;
+  private onConfirm: (name: string) => void | Promise<void>;
   private s: typeof STRINGS["de"];
 
-  constructor(app: App, parentPath: string, s: typeof STRINGS["de"], onConfirm: (name: string) => void) {
+  constructor(app: App, parentPath: string, s: typeof STRINGS["de"], onConfirm: (name: string) => void | Promise<void>) {
     super(app);
     this.parentPath = parentPath;
     this.onConfirm = onConfirm;
@@ -479,7 +523,7 @@ class CreateFolderModal extends Modal {
     const confirmBtn = btnRow.createEl("button", { text: this.s.createFolderConfirm, cls: "mod-cta" });
     confirmBtn.addEventListener("click", () => {
       const name = input.value.trim();
-      if (name) { this.onConfirm(name); }
+      if (name) { void this.onConfirm(name); }
       this.close();
     });
     input.addEventListener("keydown", (e) => {
@@ -493,10 +537,10 @@ class CreateFolderModal extends Modal {
 
 class RenameFolderModal extends Modal {
   private folder: TFolder;
-  private onConfirm: (newName: string) => void;
+  private onConfirm: (newName: string) => void | Promise<void>;
   private s: typeof STRINGS["de"];
 
-  constructor(app: App, folder: TFolder, s: typeof STRINGS["de"], onConfirm: (newName: string) => void) {
+  constructor(app: App, folder: TFolder, s: typeof STRINGS["de"], onConfirm: (newName: string) => void | Promise<void>) {
     super(app);
     this.folder = folder;
     this.onConfirm = onConfirm;
@@ -514,14 +558,14 @@ class RenameFolderModal extends Modal {
     const confirmBtn = btnRow.createEl("button", { text: this.s.renameConfirm, cls: "mod-cta" });
     confirmBtn.addEventListener("click", () => {
       const newName = input.value.trim();
-      if (newName && newName !== this.folder.name) this.onConfirm(newName);
+      if (newName && newName !== this.folder.name) void this.onConfirm(newName);
       this.close();
     });
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") confirmBtn.click();
       if (e.key === "Escape") this.close();
     });
-    setTimeout(() => input.focus(), 50);
+    window.setTimeout(() => input.focus(), 50);
   }
 
   onClose() { this.contentEl.empty(); }
@@ -529,10 +573,10 @@ class RenameFolderModal extends Modal {
 
 class ConfirmDeleteFolderModal extends Modal {
   private folderName: string;
-  private onConfirm: () => void;
+  private onConfirm: () => void | Promise<void>;
   private s: typeof STRINGS["de"];
 
-  constructor(app: App, folderName: string, s: typeof STRINGS["de"], onConfirm: () => void) {
+  constructor(app: App, folderName: string, s: typeof STRINGS["de"], onConfirm: () => void | Promise<void>) {
     super(app);
     this.folderName = folderName;
     this.onConfirm = onConfirm;
@@ -546,7 +590,7 @@ class ConfirmDeleteFolderModal extends Modal {
     const btnRow = contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
     btnRow.createEl("button", { text: this.s.cancel }).addEventListener("click", () => this.close());
     const deleteBtn = btnRow.createEl("button", { text: this.s.deleteFolder, cls: "mod-warning" });
-    deleteBtn.addEventListener("click", () => { this.onConfirm(); this.close(); });
+    deleteBtn.addEventListener("click", () => { void this.onConfirm(); this.close(); });
   }
 
   onClose() { this.contentEl.empty(); }
@@ -554,10 +598,10 @@ class ConfirmDeleteFolderModal extends Modal {
 
 class MoveFolderModal extends Modal {
   private file: TFile;
-  private onConfirm: (folder: TFolder) => void;
+  private onConfirm: (folder: TFolder) => void | Promise<void>;
   private s: typeof STRINGS["de"];
 
-  constructor(app: App, file: TFile, s: typeof STRINGS["de"], onConfirm: (folder: TFolder) => void) {
+  constructor(app: App, file: TFile, s: typeof STRINGS["de"], onConfirm: (folder: TFolder) => void | Promise<void>) {
     super(app);
     this.file = file;
     this.onConfirm = onConfirm;
@@ -595,7 +639,7 @@ class MoveFolderModal extends Modal {
         const displayPath = folder.path === "" ? "/ (Vault)" : folder.path;
         item.setText(displayPath);
         item.addEventListener("click", () => {
-          this.onConfirm(folder);
+          void this.onConfirm(folder);
           this.close();
         });
       }
@@ -626,7 +670,7 @@ class MoveFolderModal extends Modal {
 function showContextMenu(
   app: App,
   e: MouseEvent | TouchEvent,
-  items: ({ label: string; icon?: string; danger?: boolean; action: () => void } | { separator: true })[]
+  items: ({ label: string; icon?: string; danger?: boolean; action: () => void | Promise<void> } | { separator: true })[]
 ) {
   const menu = new Menu();
 
@@ -638,7 +682,7 @@ function showContextMenu(
         menuItem.setTitle(item.label);
         if (item.icon) menuItem.setIcon(item.icon);
         if (item.danger) menuItem.setWarning(true);
-        menuItem.onClick(() => item.action());
+        menuItem.onClick(() => { void item.action(); });
       });
     }
   }
@@ -723,7 +767,7 @@ class NoteGalleryView extends ItemView {
       const btnRow = modal.contentEl.createDiv({ cls: "note-gallery-modal-buttons" });
       btnRow.createEl("button", { text: s.cancel }).addEventListener("click", () => { modal.close(); resolve(); });
       const confirmBtn = btnRow.createEl("button", { text: s.createFolderConfirm, cls: "mod-cta" });
-      confirmBtn.addEventListener("click", async () => {
+      const confirmCreate = async () => {
         const name = input.value.trim();
         if (name) {
           try {
@@ -732,39 +776,32 @@ class NoteGalleryView extends ItemView {
             await this.app.workspace.getLeaf(false).openFile(file);
             await this.render();
           } catch (err) {
-            new Notice(STRINGS[this.plugin.settings.language].error + ": " + err);
+            new Notice(STRINGS[this.plugin.settings.language].error + ": " + String(err));
           }
         }
         modal.close();
         resolve();
-      });
+      };
+      confirmBtn.addEventListener("click", () => { void confirmCreate(); });
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") confirmBtn.click();
         if (e.key === "Escape") { modal.close(); resolve(); }
       });
       modal.open();
-      setTimeout(() => input.focus(), 50);
+      window.setTimeout(() => input.focus(), 50);
     });
   }
 
-  async onClose() {
+  onClose(): Promise<void> {
     this._viewportCleanup?.();
     this._viewportCleanup = undefined;
+    return Promise.resolve();
   }
 
   async navigateTo(folder: TFolder) {
-    // setViewState({active:true}) on an already-active leaf does not record history.
-    // Push current state manually, then update the view without the active flag
-    // so Obsidian doesn't overwrite the history we just wrote.
-    const leafHistory = (this.leaf as any).history;
-    if (leafHistory != null) {
-      if (!leafHistory.backHistory) leafHistory.backHistory = [];
-      leafHistory.backHistory.push({
-        state: { type: VIEW_TYPE, state: { folderPath: this.folder?.path ?? "" }, active: true },
-        eState: null,
-      });
-      leafHistory.forwardHistory = [];
-    }
+    // Update the view without the active flag so Obsidian doesn't overwrite
+    // the history entry pushLeafHistory just wrote.
+    pushLeafHistory(this.leaf, this.folder?.path ?? "");
     await this.leaf.setViewState({
       type: VIEW_TYPE,
       state: { folderPath: folder.path },
@@ -840,13 +877,13 @@ class NoteGalleryView extends ItemView {
         const crumbEl = breadcrumbEl.createSpan({ cls: "note-gallery-breadcrumb-item", text: crumb.name || "Vault" });
         if (i < this.breadcrumb.length - 1) {
           crumbEl.addClass("note-gallery-breadcrumb-link");
-          crumbEl.addEventListener("click", () => this.navigateTo(crumb));
+          crumbEl.addEventListener("click", () => { void this.navigateTo(crumb); });
         }
       });
     } else {
       const modeLabel = header.createDiv({ cls: "note-gallery-breadcrumb" });
       modeLabel.createSpan({ cls: "note-gallery-breadcrumb-link", text: s.back })
-        .addEventListener("click", () => { this.mode = "folder"; this.render(); });
+        .addEventListener("click", () => { this.mode = "folder"; void this.render(); });
       modeLabel.createSpan({ cls: "note-gallery-breadcrumb-sep", text: " / " });
       modeLabel.createSpan({ text: this.mode === "recent" ? s.recent : s.favorites });
     }
@@ -878,7 +915,7 @@ class NoteGalleryView extends ItemView {
 
     const debouncedSearchRender = debounce(() => {
       const lc = container.querySelector(".note-gallery-list") as HTMLElement;
-      if (lc) this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+      if (lc) void this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
     }, 150);
 
     // Search scope toggle: current folder ↔ whole vault
@@ -905,7 +942,7 @@ class NoteGalleryView extends ItemView {
         this.searchVaultWide = !this.searchVaultWide;
         updateScopeBtn();
         const lc = container.querySelector(".note-gallery-list") as HTMLElement;
-        if (lc) this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
+        if (lc) void this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
       });
     }
 
@@ -915,32 +952,33 @@ class NoteGalleryView extends ItemView {
       debouncedSearchRender();
     });
 
-    searchInput.addEventListener("keydown", async (e: KeyboardEvent) => {
+    searchInput.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         this.searchQuery = "";
         searchInput.value = "";
         clearBtn.addClass("is-hidden");
-        await this.render();
+        void this.render();
       }
     });
 
-    clearBtn.addEventListener("click", async () => {
+    const clearSearch = async () => {
       this.searchQuery = "";
       searchInput.value = "";
       clearBtn.addClass("is-hidden");
       const lc = container.querySelector(".note-gallery-list") as HTMLElement;
       if (lc) await this.renderList(lc, filesFolder, dateLocale, sortBy, titleWrap, thumbnailSize);
       searchInput.focus();
-    });
+    };
+    clearBtn.addEventListener("click", () => { void clearSearch(); });
 
     // Configurable toolbar buttons between the scope button and "+"
     const ts = this.plugin.settings;
-    const makeToolbarBtn = (icon: string, label: string, onClick: (e: MouseEvent) => void) => {
+    const makeToolbarBtn = (icon: string, label: string, onClick: (e: MouseEvent) => void | Promise<void>) => {
       const btn = controls.createDiv({ cls: "note-gallery-icon-btn" });
       setIcon(btn, icon);
       btn.setAttribute("aria-label", label);
       btn.title = label;
-      btn.addEventListener("click", (e) => { e.stopPropagation(); onClick(e); });
+      btn.addEventListener("click", (e) => { e.stopPropagation(); void onClick(e); });
       return btn;
     };
 
@@ -975,20 +1013,19 @@ class NoteGalleryView extends ItemView {
 
     if (ts.toolbarShowFavorites) {
       makeToolbarBtn("star", s.favorites, () => {
-        this.mode = "favorites"; this.searchQuery = ""; this.render();
+        this.mode = "favorites"; this.searchQuery = ""; void this.render();
       });
     }
 
     if (ts.toolbarShowRecent) {
       makeToolbarBtn("clock", s.recent, () => {
-        this.mode = "recent"; this.searchQuery = ""; this.render();
+        this.mode = "recent"; this.searchQuery = ""; void this.render();
       });
     }
 
     if (ts.toolbarShowOpenSettings) {
       makeToolbarBtn("settings", s.openSettings, () => {
-        (this.app as any).setting.open();
-        (this.app as any).setting.openTabById("visual-explorer");
+        openPluginSettings(this.app);
       });
     }
 
@@ -1027,11 +1064,11 @@ class NoteGalleryView extends ItemView {
       const navBuilders: (() => void)[] = [];
       if (inMenu(ms.menuShowFavorites, ms.toolbarShowFavorites)) navBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.favorites).setIcon("star");
-        item.onClick(() => { this.mode = "favorites"; this.searchQuery = ""; this.render(); });
+        item.onClick(() => { this.mode = "favorites"; this.searchQuery = ""; void this.render(); });
       }));
       if (inMenu(ms.menuShowRecent, ms.toolbarShowRecent)) navBuilders.push(() => menu.addItem(item => {
         item.setTitle(s.recent).setIcon("clock");
-        item.onClick(() => { this.mode = "recent"; this.searchQuery = ""; this.render(); });
+        item.onClick(() => { this.mode = "recent"; this.searchQuery = ""; void this.render(); });
       }));
       if (navBuilders.length) addGroup(() => navBuilders.forEach(b => b()));
 
@@ -1056,8 +1093,7 @@ class NoteGalleryView extends ItemView {
         addGroup(() => menu.addItem(item => {
           item.setTitle(s.openSettings).setIcon("settings");
           item.onClick(() => {
-            (this.app as any).setting.open();
-            (this.app as any).setting.openTabById("visual-explorer");
+            openPluginSettings(this.app);
           });
         }));
       }
@@ -1150,7 +1186,7 @@ class NoteGalleryView extends ItemView {
   ) {
     const gen = ++this._listRenderGen;
     listContainer.empty();
-    const { language, recentCount, showPreview } = this.plugin.settings;
+    const { language, recentCount } = this.plugin.settings;
     const s = STRINGS[language];
     const q = this.searchQuery.toLowerCase();
     const isGrid = this.getViewMode() === "grid";
@@ -1172,7 +1208,7 @@ class NoteGalleryView extends ItemView {
       } else {
         files = files.filter(f => {
           const cache = this.app.metadataCache.getFileCache(f);
-          return isFavorite((cache?.frontmatter ?? {}) as Record<string, unknown>);
+          return isFavorite((cache?.frontmatter ?? {}));
         });
       }
 
@@ -1180,8 +1216,8 @@ class NoteGalleryView extends ItemView {
         if (f.basename.toLowerCase().includes(q)) return true;
         const meta = this.app.metadataCache.getFileCache(f);
         const tags = [
-          ...(Array.isArray(meta?.frontmatter?.tags) ? meta.frontmatter.tags : []),
-          ...(Array.isArray(meta?.frontmatter?.categories) ? meta.frontmatter.categories : []),
+          ...frontmatterList(meta?.frontmatter, "tags"),
+          ...frontmatterList(meta?.frontmatter, "categories"),
         ];
         return tags.some(t => String(t).toLowerCase().includes(q));
       });
@@ -1280,7 +1316,7 @@ class NoteGalleryView extends ItemView {
             danger: true,
             action: () => {
               new ConfirmDeleteFolderModal(this.app, subfolder.name, s, async () => {
-                await this.app.vault.trash(subfolder, true);
+                await this.app.fileManager.trashFile(subfolder);
                 new Notice(s.deleted(subfolder.name));
                 await this.render();
               }).open();
@@ -1297,11 +1333,11 @@ class NoteGalleryView extends ItemView {
       });
       card.addEventListener("contextmenu", (e) => openFolderMenu(e));
       let longPressTimer: ReturnType<typeof setTimeout>;
-      card.addEventListener("touchstart", (e) => { longPressTimer = setTimeout(() => openFolderMenu(e), 500); }, { passive: true });
-      card.addEventListener("touchend", () => clearTimeout(longPressTimer));
-      card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
-      card.addEventListener("touchcancel", () => clearTimeout(longPressTimer));
-      card.addEventListener("click", () => this.navigateTo(subfolder));
+      card.addEventListener("touchstart", (e) => { longPressTimer = window.setTimeout(() => openFolderMenu(e), 500); }, { passive: true });
+      card.addEventListener("touchend", () => window.clearTimeout(longPressTimer));
+      card.addEventListener("touchmove", () => window.clearTimeout(longPressTimer));
+      card.addEventListener("touchcancel", () => window.clearTimeout(longPressTimer));
+      card.addEventListener("click", () => { void this.navigateTo(subfolder); });
 
       // Drop target: accept dragged notes/files
       card.addEventListener("dragover", (e) => {
@@ -1313,17 +1349,19 @@ class NoteGalleryView extends ItemView {
           card.removeClass("note-gallery-card--drag-over");
         }
       });
-      card.addEventListener("drop", async (e) => {
+      card.addEventListener("drop", (e) => {
         e.preventDefault();
         card.removeClass("note-gallery-card--drag-over");
         const filePath = e.dataTransfer?.getData("text/plain");
         if (!filePath) return;
         const draggedFile = this.app.vault.getAbstractFileByPath(filePath);
         if (!(draggedFile instanceof TFile)) return;
-        const newPath = (subfolder.path ? subfolder.path + "/" : "") + draggedFile.name;
-        await this.app.fileManager.renameFile(draggedFile, newPath);
-        new Notice(s.moved(draggedFile.basename, subfolder.path || "/"));
-        await this.render();
+        void (async () => {
+          const newPath = (subfolder.path ? subfolder.path + "/" : "") + draggedFile.name;
+          await this.app.fileManager.renameFile(draggedFile, newPath);
+          new Notice(s.moved(draggedFile.basename, subfolder.path || "/"));
+          await this.render();
+        })();
       });
     }
 
@@ -1338,8 +1376,8 @@ class NoteGalleryView extends ItemView {
       if (f.name.toLowerCase().includes(q)) return true;
       const meta = this.app.metadataCache.getFileCache(f);
       const tags = [
-        ...(Array.isArray(meta?.frontmatter?.tags) ? meta.frontmatter.tags : []),
-        ...(Array.isArray(meta?.frontmatter?.categories) ? meta.frontmatter.categories : []),
+        ...frontmatterList(meta?.frontmatter, "tags"),
+        ...frontmatterList(meta?.frontmatter, "categories"),
       ];
       return tags.some(t => String(t).toLowerCase().includes(q));
     });
@@ -1361,8 +1399,8 @@ class NoteGalleryView extends ItemView {
 
     if (this.plugin.settings.sortFavoritesFirst) {
       files = files.sort((a, b) => {
-        const favA = isFavorite((this.app.metadataCache.getFileCache(a)?.frontmatter ?? {}) as Record<string, unknown>);
-        const favB = isFavorite((this.app.metadataCache.getFileCache(b)?.frontmatter ?? {}) as Record<string, unknown>);
+        const favA = isFavorite((this.app.metadataCache.getFileCache(a)?.frontmatter ?? {}));
+        const favB = isFavorite((this.app.metadataCache.getFileCache(b)?.frontmatter ?? {}));
         if (favA && !favB) return -1;
         if (!favA && favB) return 1;
         return 0;
@@ -1376,7 +1414,7 @@ class NoteGalleryView extends ItemView {
       if (file.extension === "md") {
         await this.renderNoteCard(listContainer, file, filesFolder, dateLocale, titleWrap, thumbnailSize);
       } else {
-        await this.renderFileCard(listContainer, file, dateLocale, titleWrap, thumbnailSize);
+        this.renderFileCard(listContainer, file, dateLocale, titleWrap, thumbnailSize);
       }
     }
 
@@ -1456,7 +1494,7 @@ class NoteGalleryView extends ItemView {
         "Vault/" + imgPath,
         "Vault/" + filesFolder + "/" + imgPath.split("/").pop(),
         (file.parent?.path ? file.parent.path + "/" : "") + imgPath,
-      ].filter(Boolean) as string[]).map((p) => normalizePath(p));
+      ].filter(Boolean)).map((p) => normalizePath(p));
 
       for (const p of pathsToTry) {
         const found = this.app.vault.getAbstractFileByPath(p);
@@ -1502,7 +1540,7 @@ class NoteGalleryView extends ItemView {
           label: favorite ? s.removeFavorite : s.addFavorite,
           icon: "star",
           action: async () => {
-            await this.app.fileManager.processFrontMatter(file, (fm) => {
+            await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
               if (favorite) delete fm.favorite;
               else fm.favorite = true;
             });
@@ -1538,14 +1576,7 @@ class NoteGalleryView extends ItemView {
           action: async () => {
             const newLeaf = this.app.workspace.getLeaf("tab");
             await newLeaf.openFile(file);
-            const leafHistory = (newLeaf as any).history;
-            if (leafHistory?.backHistory != null) {
-              leafHistory.backHistory = [{
-                state: { type: VIEW_TYPE, state: { folderPath: this.folder?.path ?? "" }, active: true },
-                eState: null,
-              }];
-              leafHistory.forwardHistory = [];
-            }
+            pushLeafHistory(newLeaf, this.folder?.path ?? "");
           }
         },
         {
@@ -1572,7 +1603,7 @@ class NoteGalleryView extends ItemView {
           danger: true,
           action: () => {
             new ConfirmDeleteModal(this.app, file.basename, s, async () => {
-              await this.app.vault.trash(file, true);
+              await this.app.fileManager.trashFile(file);
               new Notice(s.deleted(file.basename));
               await this.render();
             }).open();
@@ -1594,19 +1625,19 @@ class NoteGalleryView extends ItemView {
     // Mobile: long-press
     let longPressTimer: ReturnType<typeof setTimeout>;
     card.addEventListener("touchstart", (e) => {
-      longPressTimer = setTimeout(() => openCardMenu(e), 500);
+      longPressTimer = window.setTimeout(() => openCardMenu(e), 500);
     }, { passive: true });
-    card.addEventListener("touchend", () => clearTimeout(longPressTimer));
-    card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
-    card.addEventListener("touchcancel", () => clearTimeout(longPressTimer));
+    card.addEventListener("touchend", () => window.clearTimeout(longPressTimer));
+    card.addEventListener("touchmove", () => window.clearTimeout(longPressTimer));
+    card.addEventListener("touchcancel", () => window.clearTimeout(longPressTimer));
 
     // Open note on tap/click
     card.addEventListener("click", () => {
-      this.leaf.openFile(file);
+      void this.leaf.openFile(file);
     });
   }
 
-  async renderFileCard(
+  renderFileCard(
     listContainer: HTMLElement,
     file: TFile,
     dateLocale: string,
@@ -1690,14 +1721,7 @@ class NoteGalleryView extends ItemView {
           action: async () => {
             const newLeaf = this.app.workspace.getLeaf("tab");
             await newLeaf.openFile(file);
-            const leafHistory = (newLeaf as any).history;
-            if (leafHistory?.backHistory != null) {
-              leafHistory.backHistory = [{
-                state: { type: VIEW_TYPE, state: { folderPath: this.folder?.path ?? "" }, active: true },
-                eState: null,
-              }];
-              leafHistory.forwardHistory = [];
-            }
+            pushLeafHistory(newLeaf, this.folder?.path ?? "");
           }
         },
         {
@@ -1706,7 +1730,7 @@ class NoteGalleryView extends ItemView {
           danger: true,
           action: () => {
             new ConfirmDeleteModal(this.app, file.name, s, async () => {
-              await this.app.vault.trash(file, true);
+              await this.app.fileManager.trashFile(file);
               new Notice(s.deleted(file.name));
               await this.render();
             }).open();
@@ -1725,14 +1749,14 @@ class NoteGalleryView extends ItemView {
     card.addEventListener("contextmenu", (e) => openCardMenu(e));
     let longPressTimer: ReturnType<typeof setTimeout>;
     card.addEventListener("touchstart", (e) => {
-      longPressTimer = setTimeout(() => openCardMenu(e), 500);
+      longPressTimer = window.setTimeout(() => openCardMenu(e), 500);
     }, { passive: true });
-    card.addEventListener("touchend", () => clearTimeout(longPressTimer));
-    card.addEventListener("touchmove", () => clearTimeout(longPressTimer));
-    card.addEventListener("touchcancel", () => clearTimeout(longPressTimer));
+    card.addEventListener("touchend", () => window.clearTimeout(longPressTimer));
+    card.addEventListener("touchmove", () => window.clearTimeout(longPressTimer));
+    card.addEventListener("touchcancel", () => window.clearTimeout(longPressTimer));
 
     card.addEventListener("click", () => {
-      this.leaf.openFile(file);
+      void this.leaf.openFile(file);
     });
   }
 
@@ -1750,16 +1774,14 @@ class NoteGalleryView extends ItemView {
     } else {
       files = this.app.vault.getMarkdownFiles().filter(f => {
         const cache = this.app.metadataCache.getFileCache(f);
-        return isFavorite((cache?.frontmatter ?? {}) as Record<string, unknown>);
+        return isFavorite((cache?.frontmatter ?? {}));
       });
     }
 
     for (const file of files) {
       const cache = this.app.metadataCache.getFileCache(file);
-      const cats = cache?.frontmatter?.categories;
-      const tags = cache?.frontmatter?.tags;
-      if (Array.isArray(cats)) cats.forEach((c: unknown) => allTags.add(String(c)));
-      if (Array.isArray(tags)) tags.forEach((t: unknown) => allTags.add(String(t)));
+      frontmatterList(cache?.frontmatter, "categories").forEach((c) => allTags.add(String(c)));
+      frontmatterList(cache?.frontmatter, "tags").forEach((t) => allTags.add(String(t)));
     }
 
     return [...allTags].sort();
@@ -1773,7 +1795,7 @@ class NoteGalleryView extends ItemView {
       if (this.searchQuery === tag) chip.addClass("note-gallery-tag-chip--active");
       chip.addEventListener("click", () => {
         this.searchQuery = this.searchQuery === tag ? "" : tag;
-        this.render();
+        void this.render();
       });
     }
   }
@@ -1782,9 +1804,9 @@ class NoteGalleryView extends ItemView {
 // ── Folder Suggest ────────────────────────────────────────────────────────────
 
 class FolderSuggest extends AbstractInputSuggest<TFolder> {
-  private onSelectCb: (folder: TFolder) => void;
+  private onSelectCb: (folder: TFolder) => void | Promise<void>;
 
-  constructor(app: App, inputEl: HTMLInputElement, onSelect: (folder: TFolder) => void) {
+  constructor(app: App, inputEl: HTMLInputElement, onSelect: (folder: TFolder) => void | Promise<void>) {
     super(app, inputEl);
     this.onSelectCb = onSelect;
   }
@@ -1803,7 +1825,7 @@ class FolderSuggest extends AbstractInputSuggest<TFolder> {
 
   selectSuggestion(folder: TFolder): void {
     this.setValue(folder.path);
-    this.onSelectCb(folder);
+    void this.onSelectCb(folder);
     this.close();
   }
 }
@@ -1892,7 +1914,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
       .setName(s.stThumbSize)
       .setDesc(s.stThumbSizeDesc)
       .addSlider(slider =>
-        slider.setLimits(40, 160, 8).setValue(this.plugin.settings.thumbnailSize).setDynamicTooltip()
+        slider.setLimits(40, 160, 8).setValue(this.plugin.settings.thumbnailSize)
           .onChange(async (value) => { this.plugin.settings.thumbnailSize = value; await this.plugin.saveSettings(); })
       );
 
@@ -1985,11 +2007,11 @@ class NoteGallerySettingTab extends PluginSettingTab {
       .setName(s.stTitleDateFormat)
       .setDesc(s.stTitleDateFormatDesc)
       .addDropdown(drop => {
-        (Object.keys(TITLE_DATE_FORMATS) as TitleDateFormat[]).forEach(f => drop.addOption(f, f));
+        (Object.keys(TITLE_DATE_FORMATS) as TitleDateFormat[]).forEach(f => { drop.addOption(f, f); });
         drop.setValue(this.plugin.settings.titleDateFormat)
-          .onChange(async (value) => {
+          .onChange((value) => {
             this.plugin.settings.titleDateFormat = value as TitleDateFormat;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           });
       });
 
@@ -1997,7 +2019,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
       .setName(s.stRecentCount)
       .setDesc(s.stRecentCountDesc)
       .addSlider(slider =>
-        slider.setLimits(5, 100, 5).setValue(this.plugin.settings.recentCount).setDynamicTooltip()
+        slider.setLimits(5, 100, 5).setValue(this.plugin.settings.recentCount)
           .onChange(async (value) => { this.plugin.settings.recentCount = value; await this.plugin.saveSettings(); })
       );
 
@@ -2069,7 +2091,7 @@ class NoteGallerySettingTab extends PluginSettingTab {
       .setName(s.stBreadcrumbSize)
       .setDesc(s.stBreadcrumbSizeDesc)
       .addSlider(slider =>
-        slider.setLimits(10, 18, 1).setValue(this.plugin.settings.breadcrumbFontSize).setDynamicTooltip()
+        slider.setLimits(10, 18, 1).setValue(this.plugin.settings.breadcrumbFontSize)
           .onChange(async (value) => { this.plugin.settings.breadcrumbFontSize = value; await this.plugin.saveSettings(); })
       );
   }
@@ -2123,7 +2145,7 @@ export default class NoteGalleryPlugin extends Plugin {
 
     this.app.workspace.onLayoutReady(() => {
       if (this.settings.openOnStartup) {
-        this.activateView();
+        void this.activateView();
       }
     });
   }
@@ -2135,7 +2157,7 @@ export default class NoteGalleryPlugin extends Plugin {
       leaf = workspace.getLeaf(false);
       await leaf.setViewState({ type: VIEW_TYPE, active: true });
     }
-    workspace.revealLeaf(leaf);
+    await workspace.revealLeaf(leaf);
   }
 
   async openGallery(folder: TFolder) {
@@ -2172,7 +2194,7 @@ export default class NoteGalleryPlugin extends Plugin {
   // Debounced: text settings call saveSettings on every keystroke.
   private refreshViews = debounce(() => {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
-      if (leaf.view instanceof NoteGalleryView) leaf.view.render();
+      if (leaf.view instanceof NoteGalleryView) void leaf.view.render();
     }
   }, 250);
 
