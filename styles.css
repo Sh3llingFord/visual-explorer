@@ -44,6 +44,12 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  /* In a narrow sidebar leaf the buttons wrap below the search field
+     instead of overflowing. */
+  flex-wrap: wrap;
+}
+.note-gallery-search-wrapper {
+  min-width: 140px;
 }
 .note-gallery-search-wrapper {
   flex: 1;
